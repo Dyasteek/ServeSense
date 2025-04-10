@@ -1,619 +1,542 @@
 'use client';
 
-import { useState, useEffect } from 'react';
-import { PencilIcon, PlusIcon, XMarkIcon, CheckIcon, PlayIcon } from '@heroicons/react/24/outline';
+import { useEffect, useState } from 'react';
+import { localStorageService } from '@/services/localStorage';
+import { PlusIcon, PencilIcon, TrashIcon, XMarkIcon } from '@heroicons/react/24/outline';
 
 interface Player {
-  id: number;
+  id: string;
   name: string;
   number: number;
   position: string;
+  senadeExpiration: string;
+  healthCardExpiration: string;
+  yellowCards: number;
+  redCards: number;
+  contactNumber: string;
+  emergencyContact: string;
 }
 
 interface Team {
-  id: number;
+  id: string;
   name: string;
-  maxPlayers: number;
   color: string;
+  division: string;
   players: Player[];
-}
-
-interface Match {
-  id: number;
-  homeTeam: Team;
-  awayTeam: Team;
-  date: string;
-  status: 'scheduled' | 'in_progress' | 'completed';
+  isOpponent: boolean;
 }
 
 export default function TeamPage() {
   const [team, setTeam] = useState<Team | null>(null);
-  const [isEditingTeamName, setIsEditingTeamName] = useState(false);
-  const [teamName, setTeamName] = useState('');
-  const [editingPlayer, setEditingPlayer] = useState<Player | null>(null);
-  const [newPlayer, setNewPlayer] = useState<Partial<Player>>({});
-  const [isCreatingTeam, setIsCreatingTeam] = useState(false);
-  const [isCreatingMatch, setIsCreatingMatch] = useState(false);
-  const [newTeam, setNewTeam] = useState({
-    name: '',
-    maxPlayers: 6,
-    color: '#000000'
-  });
-  const [newMatch, setNewMatch] = useState({
-    opponentTeamId: '',
-    isHomeTeam: true
-  });
-  const [opponentTeams, setOpponentTeams] = useState<Team[]>([]);
   const [loading, setLoading] = useState(true);
   const [error, setError] = useState<string | null>(null);
+  const [editingPlayer, setEditingPlayer] = useState<Player | null>(null);
+  const [newPlayer, setNewPlayer] = useState<Omit<Player, 'id'>>({
+    name: '',
+    number: 0,
+    position: '',
+    senadeExpiration: '',
+    healthCardExpiration: '',
+    yellowCards: 0,
+    redCards: 0,
+    contactNumber: '',
+    emergencyContact: ''
+  });
+  const [selectedPlayer, setSelectedPlayer] = useState<Player | null>(null);
+  const [showModal, setShowModal] = useState(false);
 
   useEffect(() => {
     loadTeam();
-    loadOpponentTeams();
   }, []);
-
-  const loadOpponentTeams = async () => {
-    try {
-      const response = await fetch(`${process.env.NEXT_PUBLIC_API_URL}/teams`, {
-        method: 'GET',
-        headers: {
-          'Accept': 'application/json',
-          'Content-Type': 'application/json',
-        },
-      });
-
-      if (!response.ok) {
-        throw new Error(`Error HTTP: ${response.status}`);
-      }
-
-      const data = await response.json();
-      setOpponentTeams(data.filter((t: Team) => t.id !== team?.id));
-    } catch (error) {
-      console.error('Error al cargar equipos contrincantes:', error);
-      setOpponentTeams([]);
-    }
-  };
 
   const loadTeam = async () => {
     try {
       setLoading(true);
-      setError(null);
-      const response = await fetch(`${process.env.NEXT_PUBLIC_API_URL}/teams/1`);
-      if (response.ok) {
-        const data = await response.json();
-        setTeam(data);
-        setTeamName(data.name);
-      } else if (response.status === 404) {
+      const teams = await localStorageService.getTeams();
+      const localTeam = teams.find(t => !t.isOpponent);
+      if (localTeam) {
+        const teamWithDivision = {
+          ...localTeam,
+          division: (localTeam as any).division || ''
+        } as Team;
+        setTeam(teamWithDivision);
+      } else {
         setTeam(null);
       }
-    } catch (error) {
-      console.error('Error al cargar el equipo:', error);
-      setError('Hubo un error al cargar el equipo');
-    } finally {
-      setLoading(false);
-    }
-  };
-
-  const handleCreateTeam = async () => {
-    try {
-      setLoading(true);
       setError(null);
-      const response = await fetch(`${process.env.NEXT_PUBLIC_API_URL}/teams`, {
-        method: 'POST',
-        headers: {
-          'Content-Type': 'application/json',
-        },
-        body: JSON.stringify(newTeam),
-      });
-
-      if (response.ok) {
-        const data = await response.json();
-        setTeam(data);
-        setTeamName(data.name);
-        setIsCreatingTeam(false);
-        setNewTeam({
-          name: '',
-          maxPlayers: 6,
-          color: '#000000'
-        });
-      }
-    } catch (error) {
-      console.error('Error al crear el equipo:', error);
-      setError(error instanceof Error ? error.message : 'Hubo un error al crear el equipo');
+    } catch (err) {
+      setError('Error al cargar el equipo');
+      console.error(err);
     } finally {
       setLoading(false);
-    }
-  };
-
-  const handleSaveTeamName = async () => {
-    if (!team) return;
-
-    try {
-      const response = await fetch(`${process.env.NEXT_PUBLIC_API_URL}/teams/${team.id}`, {
-        method: 'PUT',
-        headers: {
-          'Content-Type': 'application/json',
-        },
-        body: JSON.stringify({ name: teamName }),
-      });
-
-      if (response.ok) {
-        const updatedTeam = await response.json();
-        setTeam(updatedTeam);
-        setIsEditingTeamName(false);
-      }
-    } catch (error) {
-      console.error('Error al guardar el nombre del equipo:', error);
-      alert('Hubo un error al guardar el nombre del equipo');
-    }
-  };
-
-  const handleSavePlayer = async (player: Player) => {
-    if (!team) return;
-
-    try {
-      const response = await fetch(`${process.env.NEXT_PUBLIC_API_URL}/players/${player.id}`, {
-        method: 'PUT',
-        headers: {
-          'Content-Type': 'application/json',
-        },
-        body: JSON.stringify(player),
-      });
-
-      if (response.ok) {
-        const updatedPlayer = await response.json();
-        setTeam(prev => prev ? {
-          ...prev,
-          players: prev.players.map(p => p.id === updatedPlayer.id ? updatedPlayer : p)
-        } : null);
-        setEditingPlayer(null);
-      }
-    } catch (error) {
-      console.error('Error al guardar el jugador:', error);
-      alert('Hubo un error al guardar el jugador');
     }
   };
 
   const handleAddPlayer = async () => {
-    if (!newPlayer.name || !newPlayer.number || !newPlayer.position) return;
-
-    try {
-      const response = await fetch(`${process.env.NEXT_PUBLIC_API_URL}/players`, {
-        method: 'POST',
-        headers: {
-          'Content-Type': 'application/json',
-        },
-        body: JSON.stringify({
-          ...newPlayer,
-          teamId: team?.id
-        }),
-      });
-
-      if (response.ok) {
-        const createdPlayer = await response.json();
-        setTeam(prev => prev ? {
-          ...prev,
-          players: [...prev.players, createdPlayer]
-        } : null);
-        setNewPlayer({});
-      }
-    } catch (error) {
-      console.error('Error al agregar jugador:', error);
-      alert('Hubo un error al agregar el jugador');
-    }
-  };
-
-  const handleDeletePlayer = async (playerId: number) => {
     if (!team) return;
 
     try {
-      const response = await fetch(`${process.env.NEXT_PUBLIC_API_URL}/players/${playerId}`, {
-        method: 'DELETE',
-      });
+      const newPlayerWithId = {
+        ...newPlayer,
+        id: crypto.randomUUID()
+      };
 
-      if (response.ok) {
-        setTeam(prev => prev ? {
-          ...prev,
-          players: prev.players.filter(p => p.id !== playerId)
-        } : null);
-      }
-    } catch (error) {
-      console.error('Error al eliminar jugador:', error);
-      alert('Hubo un error al eliminar el jugador');
+      const updatedTeam = {
+        ...team,
+        players: [...team.players, newPlayerWithId]
+      };
+
+      await localStorageService.updateTeam(updatedTeam);
+      setTeam(updatedTeam);
+      setNewPlayer({
+        name: '',
+        number: 0,
+        position: '',
+        senadeExpiration: '',
+        healthCardExpiration: '',
+        yellowCards: 0,
+        redCards: 0,
+        contactNumber: '',
+        emergencyContact: ''
+      });
+    } catch (err) {
+      setError('Error al agregar el jugador');
+      console.error(err);
     }
   };
 
-  const handleCreateMatch = async () => {
-    if (!team || !newMatch.opponentTeamId) return;
+  const handleUpdatePlayer = async () => {
+    if (!team || !editingPlayer) return;
 
     try {
-      const response = await fetch(`${process.env.NEXT_PUBLIC_API_URL}/matches`, {
-        method: 'POST',
-        headers: {
-          'Accept': 'application/json',
-          'Content-Type': 'application/json',
-        },
-        body: JSON.stringify({
-          homeTeamId: newMatch.isHomeTeam ? team.id : newMatch.opponentTeamId,
-          awayTeamId: newMatch.isHomeTeam ? newMatch.opponentTeamId : team.id,
-          date: new Date().toISOString(),
-          status: 'scheduled'
-        }),
-      });
+      const updatedTeam = {
+        ...team,
+        players: team.players.map(p => 
+          p.id === editingPlayer.id ? editingPlayer : p
+        )
+      };
 
-      if (!response.ok) {
-        throw new Error(`Error HTTP: ${response.status}`);
-      }
-
-      const match = await response.json();
-      setIsCreatingMatch(false);
-      setNewMatch({
-        opponentTeamId: '',
-        isHomeTeam: true
-      });
-      window.location.href = `/matches/${match.id}`;
-    } catch (error) {
-      console.error('Error al crear el partido:', error);
-      alert('Hubo un error al crear el partido. Por favor, intenta nuevamente.');
+      await localStorageService.updateTeam(updatedTeam);
+      setTeam(updatedTeam);
+      setEditingPlayer(null);
+    } catch (err) {
+      setError('Error al actualizar el jugador');
+      console.error(err);
     }
+  };
+
+  const handleDeletePlayer = async (playerId: string) => {
+    if (!team) return;
+
+    try {
+      const updatedTeam = {
+        ...team,
+        players: team.players.filter(p => p.id !== playerId)
+      };
+
+      await localStorageService.updateTeam(updatedTeam);
+      setTeam(updatedTeam);
+    } catch (err) {
+      setError('Error al eliminar el jugador');
+      console.error(err);
+    }
+  };
+
+  const isDocumentExpired = (date: string) => {
+    return new Date(date) < new Date();
   };
 
   if (loading) {
     return (
-      <div className="container mx-auto px-4 py-8">
-        <div className="flex justify-center items-center h-64">
-          <div className="animate-spin rounded-full h-12 w-12 border-b-2 border-primary-600"></div>
-        </div>
-      </div>
-    );
-  }
-
-  if (error) {
-    return (
-      <div className="container mx-auto px-4 py-8">
-        <div className="text-center text-red-600">
-          <p>{error}</p>
-          <button
-            onClick={loadTeam}
-            className="mt-4 text-primary-600 hover:text-primary-700"
-          >
-            Intentar de nuevo
-          </button>
-        </div>
+      <div className="min-h-screen bg-gradient-to-br from-gray-50 to-gray-100 flex justify-center items-center">
+        <div className="animate-spin rounded-full h-16 w-16 border-t-4 border-b-4 border-[#59c0d9]"></div>
       </div>
     );
   }
 
   if (!team) {
     return (
-      <div className="container mx-auto px-4 py-8">
-        <div className="max-w-md mx-auto">
-          {isCreatingTeam ? (
-            <div className="bg-white rounded-lg shadow-md p-6">
-              <h2 className="text-2xl font-bold text-gray-900 mb-4">Crear Nuevo Equipo</h2>
-              {error && (
-                <div className="mb-4 p-4 bg-red-50 text-red-600 rounded-md">
-                  {error}
-                </div>
-              )}
-              <div className="space-y-4">
-                <div>
-                  <label htmlFor="teamName" className="block text-sm font-medium text-gray-700">
-                    Nombre del Equipo
-                  </label>
-                  <input
-                    type="text"
-                    id="teamName"
-                    value={newTeam.name}
-                    onChange={(e) => setNewTeam({ ...newTeam, name: e.target.value })}
-                    className="mt-1 block w-full rounded-md border-gray-300 shadow-sm focus:border-primary-500 focus:ring-primary-500"
-                    placeholder="Ingresa el nombre del equipo"
-                  />
-                </div>
-
-                <div>
-                  <label htmlFor="maxPlayers" className="block text-sm font-medium text-gray-700">
-                    Cantidad de Jugadores
-                  </label>
-                  <input
-                    type="number"
-                    id="maxPlayers"
-                    value={newTeam.maxPlayers}
-                    onChange={(e) => setNewTeam({ ...newTeam, maxPlayers: parseInt(e.target.value) })}
-                    min="6"
-                    max="20"
-                    className="mt-1 block w-full rounded-md border-gray-300 shadow-sm focus:border-primary-500 focus:ring-primary-500"
-                  />
-                  <p className="mt-1 text-sm text-gray-500">
-                    Mínimo 6 jugadores, máximo 20 jugadores
-                  </p>
-                </div>
-
-                <div>
-                  <label htmlFor="teamColor" className="block text-sm font-medium text-gray-700">
-                    Color del Equipo
-                  </label>
-                  <div className="mt-1 flex items-center gap-4">
-                    <input
-                      type="color"
-                      id="teamColor"
-                      value={newTeam.color}
-                      onChange={(e) => setNewTeam({ ...newTeam, color: e.target.value })}
-                      className="h-10 w-20 rounded cursor-pointer"
-                    />
-                    <span className="text-sm text-gray-500">
-                      {newTeam.color}
-                    </span>
-                  </div>
-                </div>
-
-                <div className="flex justify-end gap-4 pt-4">
-                  <button
-                    onClick={() => {
-                      setIsCreatingTeam(false);
-                      setError(null);
-                    }}
-                    className="px-4 py-2 text-sm font-medium text-gray-700 bg-white border border-gray-300 rounded-md hover:bg-gray-50"
-                  >
-                    Cancelar
-                  </button>
-                  <button
-                    onClick={handleCreateTeam}
-                    disabled={!newTeam.name.trim() || loading}
-                    className="px-4 py-2 text-sm font-medium text-white bg-primary-600 rounded-md hover:bg-primary-700 disabled:opacity-50 disabled:cursor-not-allowed"
-                  >
-                    {loading ? 'Creando...' : 'Crear Equipo'}
-                  </button>
-                </div>
+      <div className="min-h-screen bg-gradient-to-br from-gray-50 to-gray-100">
+        <div className="container mx-auto px-4 py-12">
+          <div className="max-w-4xl mx-auto">
+            <div className="bg-white rounded-2xl shadow-lg overflow-hidden">
+              <div className="p-6 text-center">
+                <h1 className="text-2xl font-bold text-gray-900 mb-4">No hay equipo local</h1>
+                <p className="text-gray-600 mb-6">Crea un equipo local para comenzar a gestionar tus jugadores.</p>
+                <button
+                  onClick={() => setEditingPlayer({
+                    id: crypto.randomUUID(),
+                    name: '',
+                    number: 0,
+                    position: '',
+                    senadeExpiration: '',
+                    healthCardExpiration: '',
+                    yellowCards: 0,
+                    redCards: 0,
+                    contactNumber: '',
+                    emergencyContact: ''
+                  })}
+                  className="inline-flex items-center gap-2 bg-[#59c0d9] text-white px-4 py-2 rounded-lg hover:bg-[#59c0d9]/90 transition-colors"
+                >
+                  <PlusIcon className="h-5 w-5" />
+                  Crear Equipo
+                </button>
               </div>
             </div>
-          ) : (
-            <div className="text-center">
-              <h1 className="text-3xl font-bold text-gray-900 mb-4">No tienes un equipo creado</h1>
-              <p className="text-gray-600 mb-8">
-                Crea un nuevo equipo para comenzar a gestionar tus jugadores.
-              </p>
-              <button
-                onClick={() => setIsCreatingTeam(true)}
-                className="bg-primary-600 text-white px-6 py-3 rounded-lg flex items-center gap-2 hover:bg-primary-700 transition-colors mx-auto"
-              >
-                <PlusIcon className="h-5 w-5" />
-                Crear Nuevo Equipo
-              </button>
-            </div>
-          )}
+          </div>
         </div>
       </div>
     );
   }
 
   return (
-    <div className="container mx-auto px-4 py-8">
-      <div className="flex items-center justify-between mb-8">
-        <div className="flex items-center gap-4">
-          {isEditingTeamName ? (
-            <div className="flex items-center gap-2">
-              <input
-                type="text"
-                value={teamName}
-                onChange={(e) => setTeamName(e.target.value)}
-                className="text-3xl font-bold text-gray-900 border-b-2 border-primary-600 focus:outline-none"
-              />
-              <button
-                onClick={handleSaveTeamName}
-                className="text-primary-600 hover:text-primary-700"
-              >
-                <CheckIcon className="h-5 w-5" />
-              </button>
+    <div className="min-h-screen bg-gradient-to-br from-gray-50 to-gray-100">
+      <div className="container mx-auto px-4 py-12">
+        <div className="max-w-4xl mx-auto">
+          <div className="bg-white rounded-2xl shadow-lg overflow-hidden">
+            <div className="bg-gradient-to-r from-[#59c0d9] to-[#59c0d9]/80 p-6">
+              <div className="flex items-center justify-between">
+                <div>
+                  <h1 className="text-2xl font-bold text-white">{team.name}</h1>
+                  <p className="text-white/80">{team.division}</p>
+                </div>
+                <button
+                  onClick={() => setEditingPlayer({
+                    id: crypto.randomUUID(),
+                    name: '',
+                    number: 0,
+                    position: '',
+                    senadeExpiration: '',
+                    healthCardExpiration: '',
+                    yellowCards: 0,
+                    redCards: 0,
+                    contactNumber: '',
+                    emergencyContact: ''
+                  })}
+                  className="text-white hover:text-white/80"
+                >
+                  <PlusIcon className="h-6 w-6" />
+                </button>
+              </div>
             </div>
-          ) : (
-            <div className="flex items-center gap-2">
-              <h1 className="text-3xl font-bold text-gray-900">{teamName}</h1>
-              <button
-                onClick={() => setIsEditingTeamName(true)}
-                className="text-gray-500 hover:text-gray-700"
-              >
-                <PencilIcon className="h-5 w-5" />
-              </button>
+
+            <div className="p-6">
+              {error && (
+                <div className="mb-6 p-4 bg-red-50 text-red-700 rounded-lg">
+                  {error}
+                </div>
+              )}
+
+              <div className="overflow-x-auto">
+                <table className="w-full">
+                  <thead>
+                    <tr className="text-left text-gray-500">
+                      <th className="pb-4">Nombre</th>
+                      <th className="pb-4">Número</th>
+                      <th className="pb-4">Posición</th>
+                      <th className="pb-4">Acciones</th>
+                    </tr>
+                  </thead>
+                  <tbody>
+                    {team.players.map(player => (
+                      <tr key={player.id} className="border-t border-gray-100">
+                        <td className="py-4">
+                          <button
+                            onClick={() => {
+                              setSelectedPlayer(player);
+                              setShowModal(true);
+                            }}
+                            className="text-gray-900 hover:text-[#59c0d9] transition-colors"
+                          >
+                            {player.name}
+                          </button>
+                        </td>
+                        <td className="py-4 text-gray-600">#{player.number}</td>
+                        <td className="py-4 text-gray-600">{player.position}</td>
+                        <td className="py-4">
+                          <div className="flex items-center gap-2">
+                            <button
+                              onClick={() => setEditingPlayer(player)}
+                              className="text-gray-400 hover:text-[#59c0d9] transition-colors"
+                            >
+                              <PencilIcon className="h-5 w-5" />
+                            </button>
+                            <button
+                              onClick={() => handleDeletePlayer(player.id)}
+                              className="text-gray-400 hover:text-red-500 transition-colors"
+                            >
+                              <TrashIcon className="h-5 w-5" />
+                            </button>
+                          </div>
+                        </td>
+                      </tr>
+                    ))}
+                  </tbody>
+                </table>
+              </div>
             </div>
-          )}
+          </div>
         </div>
-        <button
-          onClick={() => setIsCreatingMatch(true)}
-          className="bg-primary-600 text-white px-4 py-2 rounded-lg flex items-center gap-2 hover:bg-primary-700 transition-colors"
-        >
-          <PlayIcon className="h-5 w-5" />
-          Comenzar Partido
-        </button>
       </div>
 
-      {isCreatingMatch && (
-        <div className="fixed inset-0 bg-gray-500 bg-opacity-75 flex items-center justify-center z-50">
-          <div className="bg-white rounded-lg p-6 max-w-md w-full">
-            <h2 className="text-2xl font-bold text-gray-900 mb-4">Comenzar Nuevo Partido</h2>
-            <div className="space-y-4">
-              <div>
-                <label htmlFor="opponentTeam" className="block text-sm font-medium text-gray-700">
-                  Equipo Contrincante
-                </label>
-                <select
-                  id="opponentTeam"
-                  value={newMatch.opponentTeamId}
-                  onChange={(e) => setNewMatch({ ...newMatch, opponentTeamId: e.target.value })}
-                  className="mt-1 block w-full rounded-md border-gray-300 shadow-sm focus:border-primary-500 focus:ring-primary-500"
+      {/* Modal de Detalles del Jugador */}
+      {showModal && selectedPlayer && (
+        <div className="fixed inset-0 bg-black/50 flex items-center justify-center p-4 z-50">
+          <div className="bg-white rounded-2xl shadow-lg w-full max-w-2xl">
+            <div className="bg-gradient-to-r from-[#59c0d9] to-[#59c0d9]/80 p-6">
+              <div className="flex items-center justify-between">
+                <h2 className="text-xl font-bold text-white">Detalles del Jugador</h2>
+                <button
+                  onClick={() => setShowModal(false)}
+                  className="text-white hover:text-white/80"
                 >
-                  <option value="">Selecciona un equipo</option>
-                  {opponentTeams.map((team) => (
-                    <option key={team.id} value={team.id}>
-                      {team.name}
-                    </option>
-                  ))}
-                </select>
+                  <XMarkIcon className="h-6 w-6" />
+                </button>
               </div>
+            </div>
 
-              <div>
-                <label className="block text-sm font-medium text-gray-700 mb-2">
-                  Tipo de Partido
-                </label>
-                <div className="flex gap-4">
-                  <label className="flex items-center">
-                    <input
-                      type="radio"
-                      checked={newMatch.isHomeTeam}
-                      onChange={() => setNewMatch({ ...newMatch, isHomeTeam: true })}
-                      className="h-4 w-4 text-primary-600 focus:ring-primary-500"
-                    />
-                    <span className="ml-2">Local</span>
-                  </label>
-                  <label className="flex items-center">
-                    <input
-                      type="radio"
-                      checked={!newMatch.isHomeTeam}
-                      onChange={() => setNewMatch({ ...newMatch, isHomeTeam: false })}
-                      className="h-4 w-4 text-primary-600 focus:ring-primary-500"
-                    />
-                    <span className="ml-2">Visitante</span>
-                  </label>
+            <div className="p-6">
+              <div className="grid grid-cols-1 md:grid-cols-2 gap-6">
+                <div>
+                  <h3 className="text-lg font-semibold text-gray-900 mb-2">{selectedPlayer.name}</h3>
+                  <div className="flex items-center gap-2 mb-4">
+                    <span className="text-gray-600">#{selectedPlayer.number}</span>
+                    <span className="text-gray-600">•</span>
+                    <span className="text-gray-600">{selectedPlayer.position}</span>
+                  </div>
                 </div>
-              </div>
 
-              <div className="flex justify-end gap-4 pt-4">
-                <button
-                  onClick={() => setIsCreatingMatch(false)}
-                  className="px-4 py-2 text-sm font-medium text-gray-700 bg-white border border-gray-300 rounded-md hover:bg-gray-50"
-                >
-                  Cancelar
-                </button>
-                <button
-                  onClick={handleCreateMatch}
-                  disabled={!newMatch.opponentTeamId}
-                  className="px-4 py-2 text-sm font-medium text-white bg-primary-600 rounded-md hover:bg-primary-700 disabled:opacity-50 disabled:cursor-not-allowed"
-                >
-                  Comenzar Partido
-                </button>
+                <div className="space-y-4">
+                  <div className="bg-gray-50 rounded-lg p-4">
+                    <h3 className="text-lg font-semibold text-gray-900 mb-4">Documentación</h3>
+                    <div className="space-y-3">
+                      <div>
+                        <p className="text-sm text-gray-600">Vencimiento SENADE</p>
+                        <p className={`font-medium ${
+                          isDocumentExpired(selectedPlayer.senadeExpiration) 
+                            ? 'text-red-600' 
+                            : 'text-gray-900'
+                        }`}>
+                          {new Date(selectedPlayer.senadeExpiration).toLocaleDateString('es-ES')}
+                        </p>
+                      </div>
+                      <div>
+                        <p className="text-sm text-gray-600">Vencimiento Carnet de Salud</p>
+                        <p className={`font-medium ${
+                          isDocumentExpired(selectedPlayer.healthCardExpiration) 
+                            ? 'text-red-600' 
+                            : 'text-gray-900'
+                        }`}>
+                          {new Date(selectedPlayer.healthCardExpiration).toLocaleDateString('es-ES')}
+                        </p>
+                      </div>
+                    </div>
+                  </div>
+
+                  <div className="bg-gray-50 rounded-lg p-4">
+                    <h3 className="text-lg font-semibold text-gray-900 mb-4">Tarjetas</h3>
+                    <div className="flex items-center gap-4">
+                      <div>
+                        <p className="text-sm text-gray-600">Amarillas</p>
+                        <p className="text-2xl font-bold text-yellow-500">{selectedPlayer.yellowCards}</p>
+                      </div>
+                      <div>
+                        <p className="text-sm text-gray-600">Rojas</p>
+                        <p className="text-2xl font-bold text-red-500">{selectedPlayer.redCards}</p>
+                      </div>
+                    </div>
+                  </div>
+
+                  <div className="bg-gray-50 rounded-lg p-4">
+                    <h3 className="text-lg font-semibold text-gray-900 mb-4">Contactos</h3>
+                    <div className="space-y-3">
+                      <div>
+                        <p className="text-sm text-gray-600">Teléfono</p>
+                        <p className="font-medium text-gray-900">{selectedPlayer.contactNumber}</p>
+                      </div>
+                      <div>
+                        <p className="text-sm text-gray-600">Contacto de Emergencia</p>
+                        <p className="font-medium text-gray-900">{selectedPlayer.emergencyContact}</p>
+                      </div>
+                    </div>
+                  </div>
+                </div>
               </div>
             </div>
           </div>
         </div>
       )}
 
-      <div className="space-y-8">
-        {/* Lista de jugadores */}
-        <div>
-          <h2 className="text-xl font-semibold text-gray-900 mb-4">
-            Jugadores
-          </h2>
-          <div className="bg-white rounded-lg shadow-md divide-y divide-gray-200">
-            {team.players.map((player) => (
-              <div
-                key={player.id}
-                className="p-4 flex items-center justify-between hover:bg-gray-50"
-              >
-                {editingPlayer?.id === player.id ? (
-                  <div className="flex-1 flex items-center gap-4">
-                    <input
-                      type="text"
-                      value={editingPlayer.name}
-                      onChange={(e) => setEditingPlayer({ ...editingPlayer, name: e.target.value })}
-                      className="border rounded px-2 py-1"
-                      placeholder="Nombre"
-                    />
-                    <input
-                      type="number"
-                      value={editingPlayer.number}
-                      onChange={(e) => setEditingPlayer({ ...editingPlayer, number: parseInt(e.target.value) })}
-                      className="border rounded px-2 py-1 w-20"
-                      placeholder="Número"
-                    />
-                    <input
-                      type="text"
-                      value={editingPlayer.position}
-                      onChange={(e) => setEditingPlayer({ ...editingPlayer, position: e.target.value })}
-                      className="border rounded px-2 py-1 flex-1"
-                      placeholder="Posición"
-                    />
-                    <button
-                      onClick={(e) => {
-                        e.stopPropagation();
-                        handleSavePlayer(player);
-                      }}
-                      className="text-primary-600 hover:text-primary-700"
-                    >
-                      <CheckIcon className="h-5 w-5" />
-                    </button>
-                  </div>
-                ) : (
-                  <>
-                    <div>
-                      <p className="text-sm font-medium text-gray-900">
-                        {player.name}
-                      </p>
-                      <p className="text-sm text-gray-500">{player.position}</p>
-                    </div>
-                    <div className="flex items-center gap-2">
-                      <span className="inline-flex items-center px-2.5 py-0.5 rounded-full text-xs font-medium bg-primary-100 text-primary-800">
-                        #{player.number}
-                      </span>
-                      <button
-                        onClick={(e) => {
-                          e.stopPropagation();
-                          setEditingPlayer(player);
-                        }}
-                        className="text-gray-500 hover:text-gray-700"
-                      >
-                        <PencilIcon className="h-5 w-5" />
-                      </button>
-                      <button
-                        onClick={(e) => {
-                          e.stopPropagation();
-                          handleDeletePlayer(player.id);
-                        }}
-                        className="text-red-500 hover:text-red-700"
-                      >
-                        <XMarkIcon className="h-5 w-5" />
-                      </button>
-                    </div>
-                  </>
-                )}
-              </div>
-            ))}
-
-            {/* Formulario para nuevo jugador */}
-            <div className="p-4">
-              <div className="flex items-center gap-4">
-                <input
-                  type="text"
-                  value={newPlayer.name}
-                  onChange={(e) => setNewPlayer({ ...newPlayer, name: e.target.value })}
-                  className="border rounded px-2 py-1"
-                  placeholder="Nombre"
-                />
-                <input
-                  type="number"
-                  value={newPlayer.number || ''}
-                  onChange={(e) => setNewPlayer({ ...newPlayer, number: parseInt(e.target.value) })}
-                  className="border rounded px-2 py-1 w-20"
-                  placeholder="Número"
-                />
-                <input
-                  type="text"
-                  value={newPlayer.position}
-                  onChange={(e) => setNewPlayer({ ...newPlayer, position: e.target.value })}
-                  className="border rounded px-2 py-1 flex-1"
-                  placeholder="Posición"
-                />
+      {/* Modal de Edición/Agregar Jugador */}
+      {editingPlayer && (
+        <div className="fixed inset-0 bg-black/50 flex items-center justify-center p-4 z-50">
+          <div className="bg-white rounded-2xl shadow-lg w-full max-w-2xl">
+            <div className="bg-gradient-to-r from-[#59c0d9] to-[#59c0d9]/80 p-6">
+              <div className="flex items-center justify-between">
+                <h2 className="text-xl font-bold text-white">
+                  {editingPlayer.id ? 'Editar Jugador' : 'Agregar Jugador'}
+                </h2>
                 <button
-                  onClick={handleAddPlayer}
-                  className="flex items-center gap-2 text-primary-600 hover:text-primary-700"
+                  onClick={() => setEditingPlayer(null)}
+                  className="text-white hover:text-white/80"
                 >
-                  <PlusIcon className="h-5 w-5" />
-                  Agregar
+                  <XMarkIcon className="h-6 w-6" />
                 </button>
               </div>
             </div>
+
+            <form
+              onSubmit={(e) => {
+                e.preventDefault();
+                if (editingPlayer.id) {
+                  handleUpdatePlayer();
+                } else {
+                  handleAddPlayer();
+                }
+              }}
+              className="p-6"
+            >
+              <div className="grid grid-cols-1 md:grid-cols-2 gap-6">
+                <div className="space-y-4">
+                  <div>
+                    <label className="block text-sm font-medium text-gray-700 mb-1">
+                      Nombre
+                    </label>
+                    <input
+                      type="text"
+                      value={editingPlayer.name}
+                      onChange={e => setEditingPlayer({ ...editingPlayer, name: e.target.value })}
+                      className="w-full px-4 py-2 border border-gray-300 rounded-lg focus:outline-none focus:ring-2 focus:ring-[#59c0d9]"
+                      required
+                    />
+                  </div>
+
+                  <div>
+                    <label className="block text-sm font-medium text-gray-700 mb-1">
+                      Número
+                    </label>
+                    <input
+                      type="number"
+                      value={editingPlayer.number}
+                      onChange={e => setEditingPlayer({ ...editingPlayer, number: parseInt(e.target.value) })}
+                      className="w-full px-4 py-2 border border-gray-300 rounded-lg focus:outline-none focus:ring-2 focus:ring-[#59c0d9]"
+                      required
+                    />
+                  </div>
+
+                  <div>
+                    <label className="block text-sm font-medium text-gray-700 mb-1">
+                      Posición
+                    </label>
+                    <input
+                      type="text"
+                      value={editingPlayer.position}
+                      onChange={e => setEditingPlayer({ ...editingPlayer, position: e.target.value })}
+                      className="w-full px-4 py-2 border border-gray-300 rounded-lg focus:outline-none focus:ring-2 focus:ring-[#59c0d9]"
+                      required
+                    />
+                  </div>
+                </div>
+
+                <div className="space-y-4">
+                  <div>
+                    <label className="block text-sm font-medium text-gray-700 mb-1">
+                      Vencimiento SENADE
+                    </label>
+                    <input
+                      type="date"
+                      value={editingPlayer.senadeExpiration}
+                      onChange={e => setEditingPlayer({ ...editingPlayer, senadeExpiration: e.target.value })}
+                      className="w-full px-4 py-2 border border-gray-300 rounded-lg focus:outline-none focus:ring-2 focus:ring-[#59c0d9]"
+                      required
+                    />
+                  </div>
+
+                  <div>
+                    <label className="block text-sm font-medium text-gray-700 mb-1">
+                      Vencimiento Carnet de Salud
+                    </label>
+                    <input
+                      type="date"
+                      value={editingPlayer.healthCardExpiration}
+                      onChange={e => setEditingPlayer({ ...editingPlayer, healthCardExpiration: e.target.value })}
+                      className="w-full px-4 py-2 border border-gray-300 rounded-lg focus:outline-none focus:ring-2 focus:ring-[#59c0d9]"
+                      required
+                    />
+                  </div>
+                </div>
+
+                <div className="space-y-4">
+                  <div>
+                    <label className="block text-sm font-medium text-gray-700 mb-1">
+                      Tarjetas Amarillas
+                    </label>
+                    <input
+                      type="number"
+                      value={editingPlayer.yellowCards}
+                      onChange={e => setEditingPlayer({ ...editingPlayer, yellowCards: parseInt(e.target.value) })}
+                      className="w-full px-4 py-2 border border-gray-300 rounded-lg focus:outline-none focus:ring-2 focus:ring-[#59c0d9]"
+                      min="0"
+                      required
+                    />
+                  </div>
+
+                  <div>
+                    <label className="block text-sm font-medium text-gray-700 mb-1">
+                      Tarjetas Rojas
+                    </label>
+                    <input
+                      type="number"
+                      value={editingPlayer.redCards}
+                      onChange={e => setEditingPlayer({ ...editingPlayer, redCards: parseInt(e.target.value) })}
+                      className="w-full px-4 py-2 border border-gray-300 rounded-lg focus:outline-none focus:ring-2 focus:ring-[#59c0d9]"
+                      min="0"
+                      required
+                    />
+                  </div>
+                </div>
+
+                <div className="space-y-4">
+                  <div>
+                    <label className="block text-sm font-medium text-gray-700 mb-1">
+                      Teléfono
+                    </label>
+                    <input
+                      type="tel"
+                      value={editingPlayer.contactNumber}
+                      onChange={e => setEditingPlayer({ ...editingPlayer, contactNumber: e.target.value })}
+                      className="w-full px-4 py-2 border border-gray-300 rounded-lg focus:outline-none focus:ring-2 focus:ring-[#59c0d9]"
+                      required
+                    />
+                  </div>
+
+                  <div>
+                    <label className="block text-sm font-medium text-gray-700 mb-1">
+                      Contacto de Emergencia
+                    </label>
+                    <input
+                      type="text"
+                      value={editingPlayer.emergencyContact}
+                      onChange={e => setEditingPlayer({ ...editingPlayer, emergencyContact: e.target.value })}
+                      className="w-full px-4 py-2 border border-gray-300 rounded-lg focus:outline-none focus:ring-2 focus:ring-[#59c0d9]"
+                      required
+                    />
+                  </div>
+                </div>
+              </div>
+
+              <div className="mt-8">
+                <button
+                  type="submit"
+                  className="w-full inline-flex items-center justify-center gap-2 bg-[#59c0d9] text-white px-4 py-2 rounded-lg hover:bg-[#59c0d9]/90 transition-colors"
+                >
+                  {editingPlayer.id ? 'Guardar Cambios' : 'Agregar Jugador'}
+                </button>
+              </div>
+            </form>
           </div>
         </div>
-      </div>
+      )}
     </div>
   );
 } 

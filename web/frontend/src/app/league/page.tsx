@@ -1,287 +1,211 @@
 'use client';
 
-import { useState, useEffect } from 'react';
-import { PlusIcon, PencilIcon, TrashIcon } from '@heroicons/react/24/outline';
+import { useEffect, useState } from 'react';
+import { localStorageService } from '@/services/localStorage';
+import { ArrowLeftIcon, PencilIcon, CheckIcon, XMarkIcon } from '@heroicons/react/24/outline';
+
+interface Player {
+  id: string;
+  name: string;
+  number: number;
+  position: string;
+  senadeExpiration: string;
+  healthCardExpiration: string;
+  yellowCards: number;
+  redCards: number;
+  contactNumber: string;
+  emergencyContact: string;
+}
 
 interface Team {
   id: string;
   name: string;
   color: string;
-  divisional: string;
-  semester: string;
+  players: Player[];
   isOpponent: boolean;
+  position: number;
+  points: number;
+  matchesPlayed: number;
+  matchesWon: number;
+  matchesLost: number;
+  setsWon: number;
+  setsLost: number;
 }
 
 export default function LeaguePage() {
   const [teams, setTeams] = useState<Team[]>([]);
   const [loading, setLoading] = useState(true);
   const [error, setError] = useState<string | null>(null);
-  const [isModalOpen, setIsModalOpen] = useState(false);
-  const [editingTeam, setEditingTeam] = useState<Team | null>(null);
-  const [formData, setFormData] = useState({
-    name: '',
-    color: '#000000',
-    divisional: 'A',
-    semester: 'Primavera'
-  });
+  const [editingDivision, setEditingDivision] = useState(false);
+  const [division, setDivision] = useState('');
 
   useEffect(() => {
     loadTeams();
+    loadDivision();
   }, []);
+
+  const loadDivision = async () => {
+    try {
+      const leagueInfo = await localStorageService.getLeagueInfo();
+      setDivision(leagueInfo.division);
+    } catch (err) {
+      console.error('Error al cargar la división:', err);
+    }
+  };
+
+  const handleUpdateDivision = async () => {
+    try {
+      await localStorageService.updateLeagueInfo({ ...await localStorageService.getLeagueInfo(), division });
+      setEditingDivision(false);
+    } catch (err) {
+      setError('Error al actualizar la división');
+      console.error(err);
+    }
+  };
 
   const loadTeams = async () => {
     try {
-      const response = await fetch(`${process.env.NEXT_PUBLIC_API_URL}/teams?isOpponent=true`);
-      if (!response.ok) {
-        throw new Error('Error al cargar los equipos');
-      }
-      const data = await response.json();
-      setTeams(data);
-    } catch (error) {
-      console.error('Error:', error);
-      setError('Hubo un error al cargar los equipos');
+      setLoading(true);
+      const allTeams = await localStorageService.getTeams();
+      const rivalTeams = allTeams.filter(team => team.isOpponent);
+      
+      // Ordenar equipos por puntos (descendente) y diferencia de sets
+      const sortedTeams = rivalTeams.sort((a, b) => {
+        if (b.points !== a.points) {
+          return b.points - a.points;
+        }
+        const aSetDiff = a.setsWon - a.setsLost;
+        const bSetDiff = b.setsWon - b.setsLost;
+        return bSetDiff - aSetDiff;
+      });
+
+      // Asignar posiciones
+      const teamsWithPosition = sortedTeams.map((team, index) => ({
+        ...team,
+        position: index + 1
+      }));
+
+      setTeams(teamsWithPosition);
+      setError(null);
+    } catch (err) {
+      setError('Error al cargar los equipos');
+      console.error(err);
     } finally {
       setLoading(false);
     }
   };
 
-  const handleOpenModal = (team?: Team) => {
-    if (team) {
-      setEditingTeam(team);
-      setFormData({
-        name: team.name,
-        color: team.color,
-        divisional: team.divisional,
-        semester: team.semester
-      });
-    } else {
-      setEditingTeam(null);
-      setFormData({
-        name: '',
-        color: '#000000',
-        divisional: 'A',
-        semester: 'Primavera'
-      });
-    }
-    setIsModalOpen(true);
-  };
-
-  const handleSubmit = async (e: React.FormEvent) => {
-    e.preventDefault();
-    try {
-      const url = editingTeam
-        ? `${process.env.NEXT_PUBLIC_API_URL}/teams/${editingTeam.id}`
-        : `${process.env.NEXT_PUBLIC_API_URL}/teams`;
-
-      const response = await fetch(url, {
-        method: editingTeam ? 'PUT' : 'POST',
-        headers: {
-          'Content-Type': 'application/json',
-        },
-        body: JSON.stringify({
-          ...formData,
-          isOpponent: true
-        }),
-      });
-
-      if (!response.ok) {
-        throw new Error('Error al guardar el equipo');
-      }
-
-      await loadTeams();
-      setIsModalOpen(false);
-    } catch (error) {
-      console.error('Error:', error);
-      setError('Hubo un error al guardar el equipo');
-    }
-  };
-
-  const handleDelete = async (teamId: string) => {
-    if (!confirm('¿Estás seguro de que deseas eliminar este equipo?')) return;
-
-    try {
-      const response = await fetch(`${process.env.NEXT_PUBLIC_API_URL}/teams/${teamId}`, {
-        method: 'DELETE',
-      });
-
-      if (!response.ok) {
-        throw new Error('Error al eliminar el equipo');
-      }
-
-      await loadTeams();
-    } catch (error) {
-      console.error('Error:', error);
-      setError('Hubo un error al eliminar el equipo');
-    }
-  };
-
   if (loading) {
     return (
-      <div className="min-h-screen bg-gray-50">
-        <div className="container mx-auto px-4 py-8">
-          <div className="flex justify-center items-center h-64">
-            <div className="animate-spin rounded-full h-12 w-12 border-b-2 border-primary-600"></div>
-          </div>
-        </div>
+      <div className="min-h-screen bg-gradient-to-br from-gray-50 to-gray-100 flex justify-center items-center">
+        <div className="animate-spin rounded-full h-16 w-16 border-t-4 border-b-4 border-[#59c0d9]"></div>
       </div>
     );
   }
 
   return (
-    <div className="min-h-screen bg-gray-50">
-      <div className="container mx-auto px-4 py-8">
-        <div className="flex items-center justify-between mb-8">
-          <div>
-            <h1 className="text-3xl font-bold text-gray-900">Liga</h1>
-            <p className="text-gray-600">Gestiona los equipos rivales de la temporada</p>
-          </div>
-          <button
-            onClick={() => handleOpenModal()}
-            className="bg-primary-600 text-white px-4 py-2 rounded-lg flex items-center gap-2 hover:bg-primary-700 transition-colors"
-          >
-            <PlusIcon className="h-5 w-5" />
-            Agregar Equipo
-          </button>
-        </div>
-
-        {error && (
-          <div className="bg-red-50 text-red-600 p-4 rounded-lg mb-6">
-            {error}
-          </div>
-        )}
-
-        <div className="grid grid-cols-1 md:grid-cols-2 lg:grid-cols-3 gap-6">
-          {teams.map((team) => (
-            <div
-              key={team.id}
-              className="bg-white p-6 rounded-xl shadow-sm hover:shadow-md transition-shadow"
-            >
-              <div className="flex items-center gap-4 mb-4">
-                <div
-                  className="w-12 h-12 rounded-lg flex items-center justify-center text-white font-bold"
-                  style={{ backgroundColor: team.color }}
-                >
-                  {team.name.charAt(0)}
+    <div className="min-h-screen bg-gradient-to-br from-gray-50 to-gray-100">
+      <div className="container mx-auto px-4 py-12">
+        <div className="max-w-4xl mx-auto">
+          <div className="bg-white rounded-2xl shadow-lg overflow-hidden">
+            <div className="bg-gradient-to-r from-[#59c0d9] to-[#59c0d9]/80 p-6">
+              <div className="flex items-center justify-between">
+                <div className="flex items-center gap-4">
+                  <h1 className="text-2xl font-bold text-white">LiVoSur</h1>
+                  {editingDivision ? (
+                    <div className="flex items-center gap-2">
+                      <input
+                        type="text"
+                        value={division}
+                        onChange={(e) => setDivision(e.target.value)}
+                        className="bg-white/20 text-white placeholder-white/50 px-2 py-1 rounded focus:outline-none focus:ring-2 focus:ring-white/50"
+                        placeholder="División"
+                      />
+                      <button
+                        onClick={handleUpdateDivision}
+                        className="text-white hover:text-white/80 transition-colors"
+                      >
+                        <CheckIcon className="h-5 w-5" />
+                      </button>
+                      <button
+                        onClick={() => {
+                          setEditingDivision(false);
+                          loadDivision();
+                        }}
+                        className="text-white hover:text-white/80 transition-colors"
+                      >
+                        <XMarkIcon className="h-5 w-5" />
+                      </button>
+                    </div>
+                  ) : (
+                    <div className="flex items-center gap-2">
+                      <span className="text-white/80 font-light text-2xl">{division}</span>
+                      <button
+                        onClick={() => setEditingDivision(true)}
+                        className="text-white/80 hover:text-white transition-colors"
+                      >
+                        <PencilIcon className="h-5 w-5" />
+                      </button>
+                    </div>
+                  )}
                 </div>
-                <div>
-                  <h3 className="font-semibold text-gray-900">{team.name}</h3>
-                  <p className="text-sm text-gray-500">
-                    Divisional {team.divisional} - {team.semester}
-                  </p>
-                </div>
-              </div>
-              <div className="flex gap-2">
-                <button
-                  onClick={() => handleOpenModal(team)}
-                  className="flex-1 bg-gray-50 text-gray-700 py-2 rounded-lg hover:bg-gray-100 transition-colors flex items-center justify-center gap-2"
+                <a
+                  href="/"
+                  className="text-white hover:text-white/80 transition-colors"
                 >
-                  <PencilIcon className="h-4 w-4" />
-                  Editar
-                </button>
-                <button
-                  onClick={() => handleDelete(team.id)}
-                  className="flex-1 bg-red-50 text-red-600 py-2 rounded-lg hover:bg-red-100 transition-colors flex items-center justify-center gap-2"
-                >
-                  <TrashIcon className="h-4 w-4" />
-                  Eliminar
-                </button>
+                  <ArrowLeftIcon className="h-6 w-6" />
+                </a>
               </div>
             </div>
-          ))}
-        </div>
 
-        {/* Modal */}
-        {isModalOpen && (
-          <div className="fixed inset-0 bg-black bg-opacity-50 flex items-center justify-center p-4 z-50">
-            <div className="bg-white rounded-xl p-6 w-full max-w-md">
-              <h2 className="text-xl font-semibold mb-4">
-                {editingTeam ? 'Editar Equipo' : 'Agregar Equipo'}
-              </h2>
-              <form onSubmit={handleSubmit} className="space-y-4">
-                <div>
-                  <label className="block text-sm font-medium text-gray-700 mb-1">
-                    Nombre del Equipo
-                  </label>
-                  <input
-                    type="text"
-                    value={formData.name}
-                    onChange={(e) => setFormData({ ...formData, name: e.target.value })}
-                    className="w-full px-3 py-2 border border-gray-300 rounded-lg focus:outline-none focus:ring-2 focus:ring-primary-500"
-                    required
-                  />
+            <div className="p-6">
+              {error && (
+                <div className="mb-6 p-4 bg-red-50 text-red-700 rounded-lg">
+                  {error}
                 </div>
+              )}
 
-                <div>
-                  <label className="block text-sm font-medium text-gray-700 mb-1">
-                    Color del Equipo
-                  </label>
-                  <div className="flex gap-2">
-                    <input
-                      type="color"
-                      value={formData.color}
-                      onChange={(e) => setFormData({ ...formData, color: e.target.value })}
-                      className="w-12 h-12 rounded-lg cursor-pointer"
-                    />
-                    <input
-                      type="text"
-                      value={formData.color}
-                      onChange={(e) => setFormData({ ...formData, color: e.target.value })}
-                      className="flex-1 px-3 py-2 border border-gray-300 rounded-lg focus:outline-none focus:ring-2 focus:ring-primary-500"
-                    />
-                  </div>
-                </div>
-
-                <div>
-                  <label className="block text-sm font-medium text-gray-700 mb-1">
-                    Divisional
-                  </label>
-                  <select
-                    value={formData.divisional}
-                    onChange={(e) => setFormData({ ...formData, divisional: e.target.value })}
-                    className="w-full px-3 py-2 border border-gray-300 rounded-lg focus:outline-none focus:ring-2 focus:ring-primary-500"
-                    required
-                  >
-                    <option value="A">Divisional A</option>
-                    <option value="B">Divisional B</option>
-                    <option value="C">Divisional C</option>
-                    <option value="D">Divisional D</option>
-                  </select>
-                </div>
-
-                <div>
-                  <label className="block text-sm font-medium text-gray-700 mb-1">
-                    Semestre
-                  </label>
-                  <select
-                    value={formData.semester}
-                    onChange={(e) => setFormData({ ...formData, semester: e.target.value })}
-                    className="w-full px-3 py-2 border border-gray-300 rounded-lg focus:outline-none focus:ring-2 focus:ring-primary-500"
-                    required
-                  >
-                    <option value="Primavera">Primavera</option>
-                    <option value="Otoño">Otoño</option>
-                  </select>
-                </div>
-
-                <div className="flex gap-2 pt-4">
-                  <button
-                    type="button"
-                    onClick={() => setIsModalOpen(false)}
-                    className="flex-1 bg-gray-100 text-gray-700 py-2 rounded-lg hover:bg-gray-200 transition-colors"
-                  >
-                    Cancelar
-                  </button>
-                  <button
-                    type="submit"
-                    className="flex-1 bg-primary-600 text-white py-2 rounded-lg hover:bg-primary-700 transition-colors"
-                  >
-                    {editingTeam ? 'Guardar Cambios' : 'Agregar Equipo'}
-                  </button>
-                </div>
-              </form>
+              <div className="overflow-x-auto">
+                <table className="w-full">
+                  <thead>
+                    <tr className="text-left text-gray-500">
+                      <th className="pb-4">Pos.</th>
+                      <th className="pb-4">Equipo</th>
+                      <th className="pb-4">PJ</th>
+                      <th className="pb-4">PG</th>
+                      <th className="pb-4">PP</th>
+                      <th className="pb-4">Sets</th>
+                      <th className="pb-4">Pts.</th>
+                    </tr>
+                  </thead>
+                  <tbody>
+                    {teams.map(team => (
+                      <tr key={team.id} className="border-t border-gray-100">
+                        <td className="py-4 text-gray-600 font-medium">{team.position}°</td>
+                        <td className="py-4">
+                          <div className="flex items-center gap-3">
+                            <div
+                              className="w-4 h-4 rounded-full"
+                              style={{ backgroundColor: team.color }}
+                            />
+                            <span className="text-gray-900">{team.name}</span>
+                          </div>
+                        </td>
+                        <td className="py-4 text-gray-600">{team.matchesPlayed}</td>
+                        <td className="py-4 text-gray-600">{team.matchesWon}</td>
+                        <td className="py-4 text-gray-600">{team.matchesLost}</td>
+                        <td className="py-4 text-gray-600">
+                          {team.setsWon}-{team.setsLost}
+                        </td>
+                        <td className="py-4 text-gray-600 font-medium">{team.points}</td>
+                      </tr>
+                    ))}
+                  </tbody>
+                </table>
+              </div>
             </div>
           </div>
-        )}
+        </div>
       </div>
     </div>
   );
