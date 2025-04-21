@@ -1,4 +1,5 @@
 import { openDB, DBSchema, IDBPDatabase } from 'idb';
+import { Team, Player } from '@/types/team';
 
 interface Player {
   id: string;
@@ -61,9 +62,29 @@ interface ServeSenseDB {
   leagueInfo: LeagueInfo;
 }
 
+interface PlayerStats {
+  aces: number;
+  servicios: number;
+  ataques: number;
+  bloqueos: number;
+  defensas: number;
+  recepciones: number;
+  colocaciones: number;
+  errores: number;
+}
+
+interface PlayerWithStats extends Player {
+  stats: PlayerStats;
+}
+
+interface TeamWithStats extends Team {
+  players: PlayerWithStats[];
+}
+
 class LocalStorageService {
   private static instance: LocalStorageService;
   private db: ServeSenseDB;
+  private readonly TEAMS_KEY = 'teams';
 
   private constructor() {
     this.db = {
@@ -118,8 +139,33 @@ class LocalStorageService {
   }
 
   // Teams
-  async getTeams(): Promise<Team[]> {
-    return [...this.db.teams];
+  async getTeams(): Promise<TeamWithStats[]> {
+    try {
+      const teamsJson = localStorage.getItem(this.TEAMS_KEY);
+      if (!teamsJson) return [];
+
+      const teams = JSON.parse(teamsJson) as TeamWithStats[];
+      return teams.map(team => ({
+        ...team,
+        players: team.players.map(player => ({
+          ...player,
+          stats: {
+            aces: 0,
+            servicios: 0,
+            ataques: 0,
+            bloqueos: 0,
+            defensas: 0,
+            recepciones: 0,
+            colocaciones: 0,
+            errores: 0,
+            ...player.stats
+          }
+        }))
+      }));
+    } catch (error) {
+      console.error('Error al cargar equipos:', error);
+      return [];
+    }
   }
 
   async addTeam(team: Omit<Team, 'id'>): Promise<Team> {
@@ -141,14 +187,29 @@ class LocalStorageService {
     return newTeam;
   }
 
-  async updateTeam(team: Team): Promise<void> {
-    const index = this.db.teams.findIndex(t => t.id === team.id);
-    if (index !== -1) {
-      this.db.teams[index] = {
-        ...team,
-        players: team.players || []
-      };
-      this.saveDB();
+  async updateTeam(team: TeamWithStats): Promise<void> {
+    try {
+      const teams = await this.getTeams();
+      const updatedTeams = teams.map(t => 
+        t.id === team.id ? team : t
+      );
+      localStorage.setItem(this.TEAMS_KEY, JSON.stringify(updatedTeams));
+    } catch (error) {
+      console.error('Error al actualizar equipo:', error);
+      throw error;
+    }
+  }
+
+  async updateTeamStats(team: TeamWithStats): Promise<void> {
+    try {
+      const teams = await this.getTeams();
+      const updatedTeams = teams.map(t => 
+        t.id === team.id ? team : t
+      );
+      localStorage.setItem(this.TEAMS_KEY, JSON.stringify(updatedTeams));
+    } catch (error) {
+      console.error('Error al actualizar estadísticas:', error);
+      throw error;
     }
   }
 

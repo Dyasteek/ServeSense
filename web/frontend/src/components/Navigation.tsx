@@ -1,8 +1,9 @@
 'use client';
 
-import { useState } from 'react';
+import { useState, useEffect } from 'react';
 import Link from 'next/link';
 import { usePathname, useRouter } from 'next/navigation';
+import { useSession, signOut } from 'next-auth/react';
 import {
   HomeIcon,
   ChartBarIcon,
@@ -27,18 +28,18 @@ const navigation = [
 
 export default function Navigation() {
   const [isOpen, setIsOpen] = useState(false);
+  const { data: session, status } = useSession();
   const pathname = usePathname();
   const router = useRouter();
 
-  const handleLogout = () => {
-    // Eliminar la cookie de autenticación
-    document.cookie = 'token=; path=/; expires=Thu, 01 Jan 1970 00:00:00 GMT';
+  const handleLogout = async () => {
+    await signOut({ redirect: false });
     router.push('/login');
-    router.refresh(); // Forzar actualización de la página
+    router.refresh();
   };
 
   return (
-    <nav className="bg-white shadow-sm">
+    <nav className="bg-white shadow-sm fixed top-0 w-full z-50">
       <div className="container mx-auto px-4">
         <div className="flex justify-between h-16">
           {/* Logo y enlaces principales */}
@@ -46,22 +47,45 @@ export default function Navigation() {
             <Link href="/" className="text-xl font-bold text-primary-600">
               ServeSense
             </Link>
-            <div className="hidden md:flex items-center ml-8 space-x-4">
-              {navigation.map((item) => (
-                <Link
-                  key={item.name}
-                  href={item.href}
-                  className={`flex items-center px-3 py-2 rounded-md text-sm font-medium ${
-                    pathname === item.href
-                      ? 'bg-primary-50 text-primary-600'
-                      : 'text-gray-600 hover:bg-gray-50 hover:text-gray-900'
-                  }`}
-                >
-                  <item.icon className="h-5 w-5 mr-2" />
-                  {item.name}
-                </Link>
-              ))}
-            </div>
+            {status === 'authenticated' && (
+              <div className="hidden md:flex items-center ml-8 space-x-4">
+                {navigation.map((item) => (
+                  <Link
+                    key={item.name}
+                    href={item.href}
+                    className={`flex items-center px-3 py-2 rounded-md text-sm font-medium ${
+                      pathname === item.href
+                        ? 'bg-primary-50 text-primary-600'
+                        : 'text-gray-600 hover:bg-gray-50 hover:text-gray-900'
+                    }`}
+                  >
+                    <item.icon className="h-5 w-5 mr-2" />
+                    {item.name}
+                  </Link>
+                ))}
+              </div>
+            )}
+          </div>
+
+          {/* Botones de autenticación */}
+          <div className="hidden md:flex items-center">
+            {status === 'authenticated' ? (
+              <button
+                onClick={handleLogout}
+                className="p-2 text-gray-600 hover:text-gray-900 hover:bg-gray-100 rounded-full transition-colors"
+                title="Cerrar sesión"
+              >
+                <ArrowLeftOnRectangleIcon className="h-6 w-6" />
+              </button>
+            ) : (
+              <Link
+                href="/login"
+                className="inline-flex items-center gap-2 bg-primary-600 text-white px-4 py-2 rounded-lg hover:bg-primary-700 transition-colors"
+              >
+                <ArrowRightOnRectangleIcon className="h-5 w-5" />
+                Iniciar sesión
+              </Link>
+            )}
           </div>
 
           {/* Botón de menú móvil */}
@@ -81,8 +105,8 @@ export default function Navigation() {
       </div>
 
       {/* Menú móvil */}
-      {isOpen && (
-        <div className="md:hidden">
+      {isOpen && status === 'authenticated' && (
+        <div className="md:hidden bg-white shadow-lg z-50">
           <div className="px-2 pt-2 pb-3 space-y-1">
             {navigation.map((item) => (
               <Link
@@ -99,6 +123,13 @@ export default function Navigation() {
                 {item.name}
               </Link>
             ))}
+            <button
+              onClick={handleLogout}
+              className="w-full flex items-center px-3 py-2 rounded-md text-base font-medium text-red-600 hover:bg-red-50"
+            >
+              <ArrowLeftOnRectangleIcon className="h-5 w-5 mr-2" />
+              Cerrar sesión
+            </button>
           </div>
         </div>
       )}

@@ -1,14 +1,11 @@
-import type { Metadata } from 'next'
+'use client';
+
 import { Inter } from 'next/font/google'
 import './globals.css'
 import Navigation from '@/components/Navigation'
+import { SessionProvider } from 'next-auth/react'
 
 const inter = Inter({ subsets: ['latin'] })
-
-export const metadata: Metadata = {
-  title: 'ServeSense - Seguimiento de Estadísticas de Voleibol',
-  description: 'Herramienta para el seguimiento y análisis de estadísticas de voleibol',
-}
 
 export default function RootLayout({
   children,
@@ -18,10 +15,12 @@ export default function RootLayout({
   return (
     <html lang="es">
       <body className={inter.className}>
-        <Navigation />
-        <main className="min-h-screen bg-gray-50">
-          {children}
-        </main>
+        <SessionProvider>
+          <Navigation />
+          <main className="min-h-screen bg-gray-50 pt-16">
+            {children}
+          </main>
+        </SessionProvider>
       </body>
     </html>
   )

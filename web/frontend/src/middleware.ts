@@ -1,8 +1,9 @@
 import { NextResponse } from 'next/server';
 import type { NextRequest } from 'next/server';
+import { getToken } from 'next-auth/jwt';
 
-export function middleware(request: NextRequest) {
-  const token = request.cookies.get('token')?.value;
+export async function middleware(request: NextRequest) {
+  const token = await getToken({ req: request });
   const isLoginPage = request.nextUrl.pathname === '/login';
   const isPublicPage = ['/login', '/_next', '/favicon.ico', '/api'].some(path => 
     request.nextUrl.pathname.startsWith(path)

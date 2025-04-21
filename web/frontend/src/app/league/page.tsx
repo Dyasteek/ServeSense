@@ -2,29 +2,13 @@
 
 import { useEffect, useState } from 'react';
 import { localStorageService } from '@/services/localStorage';
-import { ArrowLeftIcon, PencilIcon, CheckIcon, XMarkIcon } from '@heroicons/react/24/outline';
+import { livosurService } from '@/services/livosurService';
+import { ArrowLeftIcon, TrophyIcon, ArrowPathIcon } from '@heroicons/react/24/outline';
 
-interface Player {
-  id: string;
+interface LivosurTeam {
   name: string;
-  number: number;
-  position: string;
-  senadeExpiration: string;
-  healthCardExpiration: string;
-  yellowCards: number;
-  redCards: number;
-  contactNumber: string;
-  emergencyContact: string;
-}
-
-interface Team {
-  id: string;
-  name: string;
-  color: string;
-  players: Player[];
-  isOpponent: boolean;
-  position: number;
   points: number;
+  position: number;
   matchesPlayed: number;
   matchesWon: number;
   matchesLost: number;
@@ -32,67 +16,80 @@ interface Team {
   setsLost: number;
 }
 
+interface Team {
+  id: string;
+  name: string;
+  division: string;
+  players: Player[];
+  isOpponent: boolean;
+  color: string;
+}
+
+interface Player {
+  id: string;
+  name: string;
+  number: number;
+  position: string;
+}
+
 export default function LeaguePage() {
-  const [teams, setTeams] = useState<Team[]>([]);
+  const [livosurTeams, setLivosurTeams] = useState<LivosurTeam[]>([]);
   const [loading, setLoading] = useState(true);
   const [error, setError] = useState<string | null>(null);
-  const [editingDivision, setEditingDivision] = useState(false);
-  const [division, setDivision] = useState('');
+  const [localTeam, setLocalTeam] = useState<Team | null>(null);
+  const [isRefreshing, setIsRefreshing] = useState(false);
 
   useEffect(() => {
-    loadTeams();
-    loadDivision();
+    loadData();
   }, []);
 
-  const loadDivision = async () => {
-    try {
-      const leagueInfo = await localStorageService.getLeagueInfo();
-      setDivision(leagueInfo.division);
-    } catch (err) {
-      console.error('Error al cargar la división:', err);
-    }
-  };
-
-  const handleUpdateDivision = async () => {
-    try {
-      await localStorageService.updateLeagueInfo({ ...await localStorageService.getLeagueInfo(), division });
-      setEditingDivision(false);
-    } catch (err) {
-      setError('Error al actualizar la división');
-      console.error(err);
-    }
-  };
-
-  const loadTeams = async () => {
+  const loadData = async () => {
     try {
       setLoading(true);
+      // Cargar equipo local
       const allTeams = await localStorageService.getTeams();
-      const rivalTeams = allTeams.filter(team => team.isOpponent);
+      const local = allTeams.find(t => !t.isOpponent);
+      setLocalTeam(local || null);
+
+      // Cargar datos de LiVoSur
+      const livosurData = await livosurService.getTeams();
+      setLivosurTeams(livosurData);
       
-      // Ordenar equipos por puntos (descendente) y diferencia de sets
-      const sortedTeams = rivalTeams.sort((a, b) => {
-        if (b.points !== a.points) {
-          return b.points - a.points;
-        }
-        const aSetDiff = a.setsWon - a.setsLost;
-        const bSetDiff = b.setsWon - b.setsLost;
-        return bSetDiff - aSetDiff;
-      });
-
-      // Asignar posiciones
-      const teamsWithPosition = sortedTeams.map((team, index) => ({
-        ...team,
-        position: index + 1
-      }));
-
-      setTeams(teamsWithPosition);
       setError(null);
     } catch (err) {
-      setError('Error al cargar los equipos');
+      setError('Error al cargar los datos de la liga');
       console.error(err);
     } finally {
       setLoading(false);
     }
+  };
+
+  const handleRefresh = async () => {
+    try {
+      setIsRefreshing(true);
+      const livosurData = await livosurService.getTeams();
+      setLivosurTeams(livosurData);
+      setError(null);
+    } catch (err) {
+      setError('Error al actualizar los datos de la liga');
+      console.error(err);
+    } finally {
+      setIsRefreshing(false);
+    }
+  };
+
+  const getTeamColor = (teamName: string) => {
+    const colors: { [key: string]: string } = {
+      'SAYAGO': '#1E40AF',
+      'CORDON AZUL': '#2563EB',
+      'OLIMPIA B': '#FCD34D',
+      'PEÑAROL U23': '#FBBF24',
+      'CBR S': '#DC2626',
+      'UDELAR B': '#7C3AED',
+      'LEGADO': '#059669',
+      'COUNTRY EL PINAR J': '#0D9488'
+    };
+    return colors[teamName] || '#6B7280';
   };
 
   if (loading) {
@@ -111,50 +108,26 @@ export default function LeaguePage() {
             <div className="bg-gradient-to-r from-[#59c0d9] to-[#59c0d9]/80 p-6">
               <div className="flex items-center justify-between">
                 <div className="flex items-center gap-4">
-                  <h1 className="text-2xl font-bold text-white">LiVoSur</h1>
-                  {editingDivision ? (
-                    <div className="flex items-center gap-2">
-                      <input
-                        type="text"
-                        value={division}
-                        onChange={(e) => setDivision(e.target.value)}
-                        className="bg-white/20 text-white placeholder-white/50 px-2 py-1 rounded focus:outline-none focus:ring-2 focus:ring-white/50"
-                        placeholder="División"
-                      />
-                      <button
-                        onClick={handleUpdateDivision}
-                        className="text-white hover:text-white/80 transition-colors"
-                      >
-                        <CheckIcon className="h-5 w-5" />
-                      </button>
-                      <button
-                        onClick={() => {
-                          setEditingDivision(false);
-                          loadDivision();
-                        }}
-                        className="text-white hover:text-white/80 transition-colors"
-                      >
-                        <XMarkIcon className="h-5 w-5" />
-                      </button>
-                    </div>
-                  ) : (
-                    <div className="flex items-center gap-2">
-                      <span className="text-white/80 font-light text-2xl">{division}</span>
-                      <button
-                        onClick={() => setEditingDivision(true)}
-                        className="text-white/80 hover:text-white transition-colors"
-                      >
-                        <PencilIcon className="h-5 w-5" />
-                      </button>
-                    </div>
-                  )}
+                  <TrophyIcon className="h-8 w-8 text-white" />
+                  <div>
+                    <h1 className="text-2xl font-bold text-white">LiVoSur</h1>
+                    {localTeam?.division && (
+                      <span className="text-white/90 text-sm">
+                        División {localTeam.division} - Apertura 2025
+                      </span>
+                    )}
+                  </div>
                 </div>
-                <a
-                  href="/"
-                  className="text-white hover:text-white/80 transition-colors"
+                <button
+                  onClick={handleRefresh}
+                  disabled={isRefreshing}
+                  className={`flex items-center gap-2 px-4 py-2 rounded-lg bg-white/10 hover:bg-white/20 transition-colors ${
+                    isRefreshing ? 'opacity-50 cursor-not-allowed' : ''
+                  }`}
                 >
-                  <ArrowLeftIcon className="h-6 w-6" />
-                </a>
+                  <ArrowPathIcon className={`h-5 w-5 text-white ${isRefreshing ? 'animate-spin' : ''}`} />
+                  <span className="text-white font-medium">Actualizar</span>
+                </button>
               </div>
             </div>
 
@@ -179,16 +152,25 @@ export default function LeaguePage() {
                     </tr>
                   </thead>
                   <tbody>
-                    {teams.map(team => (
-                      <tr key={team.id} className="border-t border-gray-100">
+                    {livosurTeams.map(team => (
+                      <tr 
+                        key={team.name} 
+                        className={`border-t border-gray-100 ${
+                          localTeam?.name === team.name ? 'bg-blue-50' : ''
+                        }`}
+                      >
                         <td className="py-4 text-gray-600 font-medium">{team.position}°</td>
                         <td className="py-4">
                           <div className="flex items-center gap-3">
                             <div
                               className="w-4 h-4 rounded-full"
-                              style={{ backgroundColor: team.color }}
+                              style={{ backgroundColor: getTeamColor(team.name) }}
                             />
-                            <span className="text-gray-900">{team.name}</span>
+                            <span className={`${
+                              localTeam?.name === team.name ? 'font-semibold' : ''
+                            } text-gray-900`}>
+                              {team.name}
+                            </span>
                           </div>
                         </td>
                         <td className="py-4 text-gray-600">{team.matchesPlayed}</td>
@@ -197,7 +179,7 @@ export default function LeaguePage() {
                         <td className="py-4 text-gray-600">
                           {team.setsWon}-{team.setsLost}
                         </td>
-                        <td className="py-4 text-gray-600 font-medium">{team.points}</td>
+                        <td className="py-4 text-gray-900 font-semibold">{team.points}</td>
                       </tr>
                     ))}
                   </tbody>

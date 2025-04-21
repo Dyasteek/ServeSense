@@ -2,6 +2,7 @@
 
 import { useState } from 'react';
 import { useRouter } from 'next/navigation';
+import { signIn } from 'next-auth/react';
 import { LockClosedIcon } from '@heroicons/react/24/outline';
 
 export default function LoginPage() {
@@ -17,21 +18,22 @@ export default function LoginPage() {
     setIsLoading(true);
 
     try {
-      // Simulamos un retraso para mostrar el estado de carga
-      await new Promise(resolve => setTimeout(resolve, 1000));
+      const result = await signIn('credentials', {
+        email,
+        password,
+        redirect: false,
+      });
 
-      // Aquí iría la lógica de autenticación real
-      if (email === 'admin@servesense.com' && password === 'admin123') {
-        // Guardar el token de autenticación
-        const date = new Date();
-        date.setTime(date.getTime() + (7 * 24 * 60 * 60 * 1000)); // 7 días
-        document.cookie = `token=dummy-token; expires=${date.toUTCString()}; path=/`;
+      if (result?.error) {
+        setError(result.error);
+      } else if (result?.ok) {
         router.push('/matches');
-        router.refresh(); // Forzar actualización de la página
+        router.refresh();
       } else {
-        setError('Credenciales inválidas. Por favor, intente nuevamente.');
+        setError('Error desconocido al iniciar sesión');
       }
     } catch (err) {
+      console.error('Error en el login:', err);
       setError('Error al iniciar sesión. Por favor, intente nuevamente.');
     } finally {
       setIsLoading(false);

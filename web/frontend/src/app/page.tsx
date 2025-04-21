@@ -3,7 +3,8 @@
 import { useEffect, useState } from 'react';
 import Link from 'next/link';
 import { localStorageService } from '@/services/localStorage';
-import { PlusIcon, PencilIcon, TrashIcon, CalendarIcon, ArrowRightIcon } from '@heroicons/react/24/outline';
+import { livosurService } from '@/services/livosurService';
+import { PlusIcon, PencilIcon, TrashIcon, CalendarIcon, ArrowRightIcon, PlayIcon } from '@heroicons/react/24/outline';
 
 interface Player {
   id: string;
@@ -41,6 +42,17 @@ interface Match {
   };
 }
 
+interface LivosurTeam {
+  name: string;
+  points: number;
+  position: number;
+  matchesPlayed: number;
+  matchesWon: number;
+  matchesLost: number;
+  setsWon: number;
+  setsLost: number;
+}
+
 export default function HomePage() {
   const [teams, setTeams] = useState<Team[]>([]);
   const [matches, setMatches] = useState<Match[]>([]);
@@ -52,6 +64,7 @@ export default function HomePage() {
     date: '',
     status: 'pending' as const
   });
+  const [livosurTeams, setLivosurTeams] = useState<LivosurTeam[]>([]);
 
   useEffect(() => {
     loadData();
@@ -60,12 +73,14 @@ export default function HomePage() {
   const loadData = async () => {
     try {
       setLoading(true);
-      const [teamsData, matchesData] = await Promise.all([
+      const [teamsData, matchesData, livosurData] = await Promise.all([
         localStorageService.getTeams(),
-        localStorageService.getMatches()
+        localStorageService.getMatches(),
+        livosurService.getTeams()
       ]);
       setTeams(teamsData);
       setMatches(matchesData);
+      setLivosurTeams(livosurData);
       setError(null);
     } catch (err) {
       setError('Error al cargar los datos');
@@ -130,6 +145,18 @@ export default function HomePage() {
             </div>
           )}
 
+          <div className="mb-12">
+            <Link 
+              href="/match/live"
+              className="block w-full max-w-2xl mx-auto"
+            >
+              <button className="w-full flex items-center justify-center gap-3 px-6 py-4 bg-[#59c0d9] text-white rounded-xl hover:bg-[#59c0d9]/90 transition-colors">
+                <PlayIcon className="h-8 w-8" />
+                <span className="text-xl font-semibold">Iniciar Partido</span>
+              </button>
+            </Link>
+          </div>
+
           <div className="grid grid-cols-1 md:grid-cols-3 gap-8">
             {/* Mi Equipo */}
             <div className="bg-white rounded-2xl shadow-lg overflow-hidden">
@@ -146,6 +173,7 @@ export default function HomePage() {
                   </Link>
                 </div>
               </div>
+
               <div className="p-6">
                 {localTeam ? (
                   <div className="space-y-4">
@@ -184,7 +212,7 @@ export default function HomePage() {
                   <div className="text-center py-8">
                     <PencilIcon className="h-12 w-12 text-gray-400 mx-auto mb-4" />
                     <p className="text-gray-700">No has creado tu equipo aún</p>
-                    <Link
+                    <Link 
                       href="/team"
                       className="mt-4 inline-flex items-center gap-2 bg-[#59c0d9] text-white px-4 py-2 rounded-lg hover:bg-[#59c0d9]/90 transition-colors"
                     >
@@ -213,27 +241,23 @@ export default function HomePage() {
               </div>
               <div className="p-6">
                 <div className="space-y-4">
-                  <h3 className="font-medium text-gray-900">Equipos Rivales</h3>
-                  {rivalTeams.slice(0, 3).map(team => (
-                    <div key={team.id} className="flex items-center justify-between bg-gray-50 p-3 rounded-lg">
-                      <div className="flex items-center gap-3">
-                        <div
-                          className="w-4 h-4 rounded-full shadow-sm"
-                          style={{ backgroundColor: team.color }}
-                        />
-                        <span className="text-gray-900">{team.name}</span>
+                  <h3 className="font-medium text-gray-900">Tabla de Posiciones</h3>
+                  <div className="space-y-2">
+                    {livosurTeams.slice(0, 4).map(team => (
+                      <div key={team.position} className="flex items-center justify-between bg-gray-50 p-3 rounded-lg">
+                        <div className="flex items-center gap-3">
+                          <span className="text-gray-900 font-medium">{team.position}.</span>
+                          <span className="text-gray-900">{team.name}</span>
+                        </div>
+                        <div className="flex items-center gap-4">
+                          <span className="text-gray-600 text-sm">{team.matchesPlayed} PJ</span>
+                          <span className="text-gray-600 text-sm">{team.matchesWon} G</span>
+                          <span className="text-gray-600 text-sm">{team.matchesLost} P</span>
+                          <span className="text-gray-600 font-medium">{team.points} pts</span>
+                        </div>
                       </div>
-                      <span className="text-sm text-gray-500">{team.players.length} jugadores</span>
-                    </div>
-                  ))}
-                  {rivalTeams.length > 3 && (
-                    <p className="text-sm text-gray-500 text-center">
-                      +{rivalTeams.length - 3} equipos más
-                    </p>
-                  )}
-                  {rivalTeams.length === 0 && (
-                    <p className="text-gray-700 text-center">No hay equipos rivales</p>
-                  )}
+                    ))}
+                  </div>
                 </div>
               </div>
             </div>
