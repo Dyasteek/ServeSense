@@ -2,9 +2,11 @@ import { Team, Player } from '@/types/team';
 
 class TeamService {
   private static instance: TeamService;
-  private readonly API_URL = `${process.env.NEXT_PUBLIC_API_URL || ''}/api/teams`;
+  private API_URL: string;
 
-  private constructor() {}
+  private constructor() {
+    this.API_URL = process.env.NEXT_PUBLIC_API_URL || 'http://localhost:3000/api/teams';
+  }
 
   public static getInstance(): TeamService {
     if (!TeamService.instance) {
@@ -30,8 +32,8 @@ class TeamService {
 
   async createTeam(teamData: Omit<Team, '_id'>): Promise<Team | null> {
     try {
-      console.log('Enviando datos del equipo:', teamData);
-      console.log('URL de la API:', this.API_URL);
+      // Primero intentamos crear en la nube
+      console.log('Enviando datos del equipo a la nube:', teamData);
       
       const response = await fetch(this.API_URL, {
         method: 'POST',
@@ -41,37 +43,44 @@ class TeamService {
         body: JSON.stringify(teamData),
       });
 
-      console.log('Status de la respuesta:', response.status);
-      console.log('Headers de la respuesta:', Object.fromEntries(response.headers.entries()));
-
-      const responseText = await response.text();
-      console.log('Respuesta del servidor (texto):', responseText);
-
-      let data;
-      try {
-        data = JSON.parse(responseText);
-      } catch (parseError) {
-        console.error('Error al parsear la respuesta JSON:', parseError);
-        throw new Error(`Error al procesar la respuesta del servidor: ${responseText.substring(0, 100)}...`);
-      }
-
       if (!response.ok) {
-        if (response.status === 400) {
-          throw new Error(`Error de validación: ${data.details?.join(', ') || data.message}`);
-        }
-        throw new Error(data.message || 'Error al crear equipo');
+        const errorData = await response.json();
+        throw new Error(errorData.message || 'Error al crear equipo en la nube');
       }
 
-      console.log('Respuesta del servidor procesada:', data);
-      return data;
+      const cloudTeam = await response.json();
+      console.log('Equipo creado en la nube:', cloudTeam);
+
+      // Guardamos también en localStorage como respaldo
+      try {
+        const localTeams = JSON.parse(localStorage.getItem('teams') || '[]');
+        localTeams.push(cloudTeam);
+        localStorage.setItem('teams', JSON.stringify(localTeams));
+        console.log('Equipo guardado localmente como respaldo');
+      } catch (localError) {
+        console.warn('Error al guardar equipo localmente:', localError);
+      }
+
+      return cloudTeam;
     } catch (error: any) {
-      console.error('Error detallado al crear equipo:', {
-        message: error.message,
-        name: error.name,
-        stack: error.stack,
-        url: this.API_URL
-      });
-      throw error;
+      console.error('Error al crear equipo:', error);
+      
+      // Si falla la creación en la nube, intentamos guardar localmente
+      try {
+        const localTeams = JSON.parse(localStorage.getItem('teams') || '[]');
+        const localTeam = {
+          ...teamData,
+          _id: crypto.randomUUID(),
+          syncStatus: 'pending'
+        };
+        localTeams.push(localTeam);
+        localStorage.setItem('teams', JSON.stringify(localTeams));
+        console.log('Equipo guardado localmente debido a error de conexión');
+        return localTeam;
+      } catch (localError) {
+        console.error('Error al guardar equipo localmente:', localError);
+        throw error;
+      }
     }
   }
 

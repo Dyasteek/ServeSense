@@ -20,7 +20,7 @@ const userSchema = new mongoose.Schema({
   teamId: {
     type: mongoose.Schema.Types.ObjectId,
     ref: 'Team',
-    required: true
+    // required: true // Eliminado para permitir usuarios sin equipo
   },
   role: {
     type: String,

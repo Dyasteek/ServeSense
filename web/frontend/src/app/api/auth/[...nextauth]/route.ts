@@ -40,7 +40,7 @@ const handler = NextAuth({
             id: user._id.toString(),
             email: user.email,
             name: user.name,
-            teamId: user.teamId.toString(),
+            teamId: user.teamId ? user.teamId.toString() : null,
             role: user.role
           };
         } catch (error) {

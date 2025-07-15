@@ -1,6 +1,12 @@
 import { NextResponse } from 'next/server';
-import connectDB from '@/lib/mongodb';
-import { Team } from '@/models/team';
+import { connectDB } from '../../../lib/db';
+import { Team } from '../../../models/team';
+import { ValidationError } from 'mongoose';
+
+interface PlayerError {
+  message: string;
+  path: string;
+}
 
 export async function GET() {
   try {
@@ -18,11 +24,44 @@ export async function POST(request: Request) {
     await connectDB();
     const body = await request.json();
     
-    // Log para debug
-    console.log('Datos recibidos:', body);
+    // Validaciones básicas
+    if (!body.name || !body.division) {
+      return NextResponse.json({ 
+        error: 'Error de validación', 
+        details: ['Nombre y división son campos requeridos']
+      }, { status: 400 });
+    }
+
+    if (!Array.isArray(body.players) || body.players.length === 0) {
+      return NextResponse.json({ 
+        error: 'Error de validación', 
+        details: ['El equipo debe tener al menos un jugador']
+      }, { status: 400 });
+    }
+
+    // Validar datos de jugadores
+    const playerErrors: string[] = [];
+    body.players.forEach((player: any, index: number) => {
+      if (!player.name || !player.number || !player.position) {
+        playerErrors.push(`Jugador ${index + 1}: nombre, número y posición son requeridos`);
+      }
+      if (!player.senadeExpiration || !player.healthCardExpiration) {
+        playerErrors.push(`Jugador ${index + 1}: fechas de SENADE y Ficha Médica son requeridas`);
+      }
+      if (!player.emergencyContact || !player.contactNumber) {
+        playerErrors.push(`Jugador ${index + 1}: contacto de emergencia y número son requeridos`);
+      }
+    });
+
+    if (playerErrors.length > 0) {
+      return NextResponse.json({ 
+        error: 'Error de validación', 
+        details: playerErrors
+      }, { status: 400 });
+    }
 
     // Asegurarse de que los jugadores tengan las estadísticas inicializadas
-    const playersWithStats = body.players.map(player => ({
+    const playersWithStats = body.players.map((player: any) => ({
       ...player,
       stats: {
         aces: 0,
@@ -44,27 +83,30 @@ export async function POST(request: Request) {
 
     const team = await Team.create(teamData);
     
-    // Log para debug
-    console.log('Equipo creado:', team);
-    
     return NextResponse.json(team);
-  } catch (error) {
-    // Log detallado del error
-    console.error('Error detallado al crear equipo:', {
+  } catch (error: any) {
+    console.error('Error al crear equipo:', {
       message: error.message,
       stack: error.stack,
       name: error.name
     });
 
-    if (error.name === 'ValidationError') {
+    if (error instanceof ValidationError) {
       return NextResponse.json({ 
         error: 'Error de validación', 
-        details: Object.values(error.errors).map(err => err.message)
+        details: Object.values(error.errors).map((err: PlayerError) => err.message)
       }, { status: 400 });
     }
 
+    if (error.code === 11000) {
+      return NextResponse.json({ 
+        error: 'Error de duplicación', 
+        details: ['Ya existe un equipo con ese nombre']
+      }, { status: 409 });
+    }
+
     return NextResponse.json({ 
-      error: 'Error al crear equipo',
+      error: 'Error interno del servidor',
       message: error.message
     }, { status: 500 });
   }
