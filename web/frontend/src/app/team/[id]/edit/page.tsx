@@ -157,7 +157,7 @@ export default function EditPlayerPage() {
                       type="text"
                       value={player.name}
                       onChange={e => setPlayer({ ...player, name: e.target.value })}
-                      className="w-full px-4 py-2 border border-gray-300 rounded-lg focus:outline-none focus:ring-2 focus:ring-[#59c0d9]"
+                      className="w-full px-4 py-2 border border-gray-300 rounded-lg focus:outline-none focus:ring-2 focus:ring-[#59c0d9] bg-white text-gray-900"
                       required
                     />
                   </div>
@@ -170,7 +170,7 @@ export default function EditPlayerPage() {
                       type="number"
                       value={player.number}
                       onChange={e => setPlayer({ ...player, number: parseInt(e.target.value) })}
-                      className="w-full px-4 py-2 border border-gray-300 rounded-lg focus:outline-none focus:ring-2 focus:ring-[#59c0d9]"
+                      className="w-full px-4 py-2 border border-gray-300 rounded-lg focus:outline-none focus:ring-2 focus:ring-[#59c0d9] bg-white text-gray-900"
                       required
                     />
                   </div>
@@ -183,7 +183,7 @@ export default function EditPlayerPage() {
                       type="text"
                       value={player.position}
                       onChange={e => setPlayer({ ...player, position: e.target.value })}
-                      className="w-full px-4 py-2 border border-gray-300 rounded-lg focus:outline-none focus:ring-2 focus:ring-[#59c0d9]"
+                      className="w-full px-4 py-2 border border-gray-300 rounded-lg focus:outline-none focus:ring-2 focus:ring-[#59c0d9] bg-white text-gray-900"
                       required
                     />
                   </div>
@@ -198,7 +198,7 @@ export default function EditPlayerPage() {
                       type="date"
                       value={player.senadeExpiration}
                       onChange={e => setPlayer({ ...player, senadeExpiration: e.target.value })}
-                      className="w-full px-4 py-2 border border-gray-300 rounded-lg focus:outline-none focus:ring-2 focus:ring-[#59c0d9]"
+                      className="w-full px-4 py-2 border border-gray-300 rounded-lg focus:outline-none focus:ring-2 focus:ring-[#59c0d9] bg-white text-gray-900"
                       required
                     />
                   </div>
@@ -211,7 +211,7 @@ export default function EditPlayerPage() {
                       type="date"
                       value={player.healthCardExpiration}
                       onChange={e => setPlayer({ ...player, healthCardExpiration: e.target.value })}
-                      className="w-full px-4 py-2 border border-gray-300 rounded-lg focus:outline-none focus:ring-2 focus:ring-[#59c0d9]"
+                      className="w-full px-4 py-2 border border-gray-300 rounded-lg focus:outline-none focus:ring-2 focus:ring-[#59c0d9] bg-white text-gray-900"
                       required
                     />
                   </div>
@@ -226,7 +226,7 @@ export default function EditPlayerPage() {
                       type="number"
                       value={player.yellowCards}
                       onChange={e => setPlayer({ ...player, yellowCards: parseInt(e.target.value) })}
-                      className="w-full px-4 py-2 border border-gray-300 rounded-lg focus:outline-none focus:ring-2 focus:ring-[#59c0d9]"
+                      className="w-full px-4 py-2 border border-gray-300 rounded-lg focus:outline-none focus:ring-2 focus:ring-[#59c0d9] bg-white text-gray-900"
                       min="0"
                       required
                     />
@@ -240,7 +240,7 @@ export default function EditPlayerPage() {
                       type="number"
                       value={player.redCards}
                       onChange={e => setPlayer({ ...player, redCards: parseInt(e.target.value) })}
-                      className="w-full px-4 py-2 border border-gray-300 rounded-lg focus:outline-none focus:ring-2 focus:ring-[#59c0d9]"
+                      className="w-full px-4 py-2 border border-gray-300 rounded-lg focus:outline-none focus:ring-2 focus:ring-[#59c0d9] bg-white text-gray-900"
                       min="0"
                       required
                     />
@@ -256,7 +256,7 @@ export default function EditPlayerPage() {
                       type="tel"
                       value={player.contactNumber}
                       onChange={e => setPlayer({ ...player, contactNumber: e.target.value })}
-                      className="w-full px-4 py-2 border border-gray-300 rounded-lg focus:outline-none focus:ring-2 focus:ring-[#59c0d9]"
+                      className="w-full px-4 py-2 border border-gray-300 rounded-lg focus:outline-none focus:ring-2 focus:ring-[#59c0d9] bg-white text-gray-900"
                       required
                     />
                   </div>
@@ -269,7 +269,7 @@ export default function EditPlayerPage() {
                       type="text"
                       value={player.emergencyContact}
                       onChange={e => setPlayer({ ...player, emergencyContact: e.target.value })}
-                      className="w-full px-4 py-2 border border-gray-300 rounded-lg focus:outline-none focus:ring-2 focus:ring-[#59c0d9]"
+                      className="w-full px-4 py-2 border border-gray-300 rounded-lg focus:outline-none focus:ring-2 focus:ring-[#59c0d9] bg-white text-gray-900"
                       required
                     />
                   </div>

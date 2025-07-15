@@ -4,6 +4,15 @@ const connectDB = require('./config/database');
 require('dotenv').config();
 
 const app = express();
+const http = require('http');
+const server = http.createServer(app);
+const { Server } = require('socket.io');
+const io = new Server(server, {
+  cors: {
+    origin: '*',
+    methods: ['GET', 'POST', 'PUT', 'PATCH']
+  }
+});
 
 // Conectar a MongoDB
 connectDB();
@@ -14,7 +23,8 @@ app.use(express.json());
 
 // Rutas
 app.use('/api/teams', require('./routes/teamRoutes'));
-app.use('/api/players', require('./routes/playerRoutes'));
+const playerRoutes = require('./routes/playerRoutes');
+app.use('/api/players', playerRoutes(io));
 app.use('/api/matches', require('./routes/matchRoutes'));
 
 // Manejo de errores
@@ -25,6 +35,14 @@ app.use((err, req, res, next) => {
 
 const PORT = process.env.PORT || 5000;
 
-app.listen(PORT, () => {
+server.listen(PORT, () => {
   console.log(`Servidor corriendo en el puerto ${PORT}`);
+});
+
+// Socket.IO eventos básicos
+io.on('connection', (socket) => {
+  console.log('Usuario conectado:', socket.id);
+  socket.on('disconnect', () => {
+    console.log('Usuario desconectado:', socket.id);
+  });
 }); 

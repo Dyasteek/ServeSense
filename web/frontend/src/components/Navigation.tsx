@@ -17,12 +17,11 @@ import {
   Bars3Icon,
   XMarkIcon
 } from '@heroicons/react/24/outline';
+import BackupButton from './BackupButton';
 
 const navigation = [
   { name: 'Inicio', href: '/', icon: HomeIcon },
   { name: 'Mi Equipo', href: '/team', icon: UserGroupIcon },
-  { name: 'Partidos', href: '/matches', icon: CalendarIcon },
-  { name: 'Liga', href: '/league', icon: TrophyIcon },
   { name: 'Estadísticas', href: '/stats', icon: ChartBarIcon },
 ];
 
@@ -63,6 +62,20 @@ export default function Navigation() {
                     {item.name}
                   </Link>
                 ))}
+                {/* Botón Dashboard solo para admin */}
+                {session?.user?.role === 'admin' && (
+                  <Link
+                    href="/admin"
+                    className={`flex items-center px-3 py-2 rounded-md text-sm font-medium ${
+                      pathname === '/admin'
+                        ? 'bg-primary-50 text-primary-600'
+                        : 'text-gray-600 hover:bg-gray-50 hover:text-gray-900'
+                    }`}
+                  >
+                    <ChartBarIcon className="h-5 w-5 mr-2" />
+                    Dashboard
+                  </Link>
+                )}
               </div>
             )}
           </div>
@@ -70,13 +83,17 @@ export default function Navigation() {
           {/* Botones de autenticación */}
           <div className="hidden md:flex items-center">
             {status === 'authenticated' ? (
-              <button
-                onClick={handleLogout}
-                className="p-2 text-gray-600 hover:text-gray-900 hover:bg-gray-100 rounded-full transition-colors"
-                title="Cerrar sesión"
-              >
-                <ArrowLeftOnRectangleIcon className="h-6 w-6" />
-              </button>
+              <div className="flex items-center gap-3">
+                <span className="hidden md:inline text-gray-700 font-medium max-w-xs truncate" title={session?.user?.name ?? ''}>{session?.user?.name ?? ''}</span>
+                <BackupButton />
+                <button
+                  onClick={handleLogout}
+                  className="p-2 text-gray-600 hover:text-gray-900 hover:bg-gray-100 rounded-full transition-colors"
+                  title="Cerrar sesión"
+                >
+                  <ArrowLeftOnRectangleIcon className="h-6 w-6" />
+                </button>
+              </div>
             ) : (
               <Link
                 href="/login"
@@ -123,6 +140,27 @@ export default function Navigation() {
                 {item.name}
               </Link>
             ))}
+            {/* Botón Dashboard solo para admin en móvil */}
+            {session?.user?.role === 'admin' && (
+              <Link
+                href="/admin"
+                className={`flex items-center px-3 py-2 rounded-md text-base font-medium ${
+                  pathname === '/admin'
+                    ? 'bg-primary-50 text-primary-600'
+                    : 'text-gray-600 hover:bg-gray-50 hover:text-gray-900'
+                }`}
+                onClick={() => setIsOpen(false)}
+              >
+                <ChartBarIcon className="h-5 w-5 mr-2" />
+                Dashboard
+              </Link>
+            )}
+            {status === 'authenticated' && (
+              <div className="flex items-center gap-2 px-3 py-2">
+                <span className="text-gray-700 font-medium max-w-xs truncate" title={session?.user?.name ?? ''}>{session?.user?.name ?? ''}</span>
+                <BackupButton />
+              </div>
+            )}
             <button
               onClick={handleLogout}
               className="w-full flex items-center px-3 py-2 rounded-md text-base font-medium text-red-600 hover:bg-red-50"

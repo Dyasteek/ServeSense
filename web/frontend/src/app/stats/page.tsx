@@ -2,6 +2,10 @@
 
 import { useState, useEffect } from 'react';
 import { localStorageService } from '@/services/localStorage';
+import { useSession } from 'next-auth/react';
+import { getLocalBackup } from '@/utils/localBackup';
+import { useRef } from 'react';
+import { io as socketIOClient } from 'socket.io-client';
 
 interface Player {
   id: string;
@@ -55,25 +59,65 @@ const POSITIONS = [
 ];
 
 export default function StatsScreen() {
+  const { data: session } = useSession();
   const [team, setTeam] = useState<Team | null>(null);
+  const [estadisticas, setEstadisticas] = useState<any[]>([]);
   const [loading, setLoading] = useState(true);
   const [error, setError] = useState<string | null>(null);
+  const socketRef = useRef<any>(null);
 
   useEffect(() => {
     loadTeam();
+    // eslint-disable-next-line
+  }, [session]);
+
+  // Conexión a Socket.IO para tiempo real
+  useEffect(() => {
+    if (!socketRef.current) {
+      socketRef.current = socketIOClient(process.env.NEXT_PUBLIC_SOCKET_URL || 'http://localhost:5000');
+    }
+    const socket = socketRef.current;
+    socket.on('stats-updated', ({ playerId, stats }: { playerId: any, stats: any }) => {
+      setTeam(prevTeam => {
+        if (!prevTeam) return prevTeam;
+        const updatedPlayers = prevTeam.players.map(p => {
+          if (p.id === playerId) {
+            return {
+              ...p,
+              stats: {
+                ...p.stats,
+                ...stats
+              }
+            };
+          }
+          return p;
+        });
+        return { ...prevTeam, players: updatedPlayers };
+      });
+    });
+    return () => {
+      socket.off('stats-updated');
+    };
   }, []);
 
-  const loadTeam = async () => {
+  const loadTeam = () => {
     try {
       setLoading(true);
-      const teams = await localStorageService.getTeams();
-      const localTeam = teams.find(t => !t.isOpponent);
-      if (localTeam) {
-        setTeam(localTeam as Team);
+      const userId = session?.user?.id;
+      if (!userId) throw new Error('No autenticado');
+      const backup = getLocalBackup(userId);
+      if (backup && backup.equipos.length > 0) {
+        setTeam(backup.equipos[0]);
+        setEstadisticas(backup.estadisticas || []);
+      } else {
+        setTeam(null);
+        setEstadisticas([]);
       }
       setError(null);
     } catch (err) {
       setError('Error al cargar el equipo');
+      setTeam(null);
+      setEstadisticas([]);
       console.error(err);
     } finally {
       setLoading(false);
@@ -113,12 +157,24 @@ export default function StatsScreen() {
               <div className="flex items-center justify-between">
                 <div>
                   <h1 className="text-2xl font-bold text-white">Estadísticas de {team.name}</h1>
-                  <p className="text-white/80">{team.division}</p>
+                  <p className="text-white/80">División: {team.division}</p>
                 </div>
               </div>
             </div>
 
             <div className="p-6">
+              {estadisticas.length > 0 && (
+                <div className="mb-8">
+                  <h2 className="text-xl font-semibold text-gray-900 mb-4">Estadísticas Generales</h2>
+                  <ul className="list-disc pl-6">
+                    {estadisticas.map(est => (
+                      <li key={est.id} className="mb-1">
+                        <span className="font-medium text-gray-700">{est.descripcion}:</span> <span className="text-gray-900">{est.valor}</span>
+                      </li>
+                    ))}
+                  </ul>
+                </div>
+              )}
               {POSITIONS.map((position) => (
                 <div key={position} className="mb-8">
                   <h2 className="text-xl font-semibold text-gray-900 mb-4">{position}s</h2>

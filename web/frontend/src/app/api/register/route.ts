@@ -5,13 +5,17 @@ import bcrypt from 'bcryptjs';
 
 export async function POST(req: Request) {
   try {
-    const { name, email, password } = await req.json();
+    const { name, email, password, role } = await req.json();
     if (!name || !email || !password) {
       return NextResponse.json({ message: 'Todos los campos son obligatorios.' }, { status: 400 });
     }
     if (password.length < 6) {
       return NextResponse.json({ message: 'La contraseña debe tener al menos 6 caracteres.' }, { status: 400 });
     }
+
+    // Validar rol
+    const validRoles = ['admin', 'coach'];
+    const userRole = validRoles.includes(role) ? role : 'coach';
 
     await connectDB();
     const existingUser = await User.findOne({ email });
@@ -24,7 +28,7 @@ export async function POST(req: Request) {
       name,
       email,
       password: hashedPassword,
-      role: 'coach', // Cambiado de 'user' a 'coach'
+      role: userRole,
     });
     await newUser.save();
 

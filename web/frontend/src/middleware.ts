@@ -15,9 +15,20 @@ export async function middleware(request: NextRequest) {
     return NextResponse.redirect(url);
   }
 
-  // Si hay token y está en login, redirigir a matches
+  // Si hay token y está en login, redirigir según el rol
   if (token && isLoginPage) {
-    const url = new URL('/matches', request.url);
+    if (token.role === 'admin') {
+      const url = new URL('/admin', request.url);
+      return NextResponse.redirect(url);
+    } else {
+      const url = new URL('/matches', request.url);
+      return NextResponse.redirect(url);
+    }
+  }
+
+  // Si un usuario autenticado que no es admin intenta acceder a /admin, redirigir a /acceso-restringido
+  if (token && request.nextUrl.pathname.startsWith('/admin') && token.role !== 'admin') {
+    const url = new URL('/acceso-restringido', request.url);
     return NextResponse.redirect(url);
   }
 

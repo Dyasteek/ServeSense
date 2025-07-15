@@ -13,9 +13,9 @@ export default function RootLayout({
 }: {
   children: React.ReactNode
 }) {
-  const pathname = typeof window !== 'undefined' ? window.location.pathname : '';
-  // Si estamos en /login, no mostrar la navbar
-  const hideNavbar = pathname === '/login';
+  const pathname = usePathname();
+  // Si estamos en /login o /admin, no mostrar la navbar
+  const hideNavbar = pathname === '/login' || pathname.startsWith('/admin');
 
   return (
     <html lang="es">

@@ -5,7 +5,9 @@ import { PlusIcon, PencilIcon } from '@heroicons/react/24/outline';
 import { useRouter } from 'next/navigation';
 import CreateTeamModal from '@/components/CreateTeamModal';
 import EditPlayerModal from '@/components/EditPlayerModal';
-import { localStorageService } from '@/services/localStorage';
+import { Player as PlayerType } from '@/types/team';
+import { useSession } from 'next-auth/react';
+import { getLocalBackup, saveLocalBackup } from '@/utils/localBackup';
 
 interface Player {
   id: string;
@@ -30,8 +32,43 @@ interface Team {
   setsLost: number;
 }
 
+// Tipos para partido y estadística
+interface Match {
+  id: string;
+  date: string;
+  opponent: string;
+  result: string;
+  score: string;
+}
+
+interface Estadistica {
+  id: string;
+  descripcion: string;
+  valor: number;
+}
+
+const defaultPlayerFields = {
+  stats: {
+    aces: 0,
+    servicios: 0,
+    ataques: 0,
+    bloqueos: 0,
+    defensas: 0,
+    recepciones: 0,
+    colocaciones: 0,
+    errores: 0
+  },
+  senadeExpiration: '',
+  healthCardExpiration: '',
+  yellowCards: 0,
+  redCards: 0,
+  emergencyContact: '',
+  contactNumber: ''
+};
+
 export default function TeamPage() {
   const router = useRouter();
+  const { data: session } = useSession();
   const [team, setTeam] = useState<Team | null>(null);
   const [loading, setLoading] = useState(true);
   const [error, setError] = useState<string | null>(null);
@@ -41,33 +78,47 @@ export default function TeamPage() {
 
   useEffect(() => {
     loadTeam();
-  }, []);
+    // eslint-disable-next-line
+  }, [session]);
 
-  const loadTeam = async () => {
+  const loadTeam = () => {
+    setLoading(true);
     try {
-      setLoading(true);
-      const teams = await localStorageService.getTeams();
-      const localTeam = teams.find(t => !t.isOpponent);
-      if (localTeam) {
-        setTeam(localTeam as Team);
+      const userId = session?.user?.id;
+      if (!userId) throw new Error('No autenticado');
+      const backup = getLocalBackup(userId);
+      if (backup && backup.equipos.length > 0) {
+        setTeam(backup.equipos[0]);
       } else {
         setTeam(null);
       }
       setError(null);
     } catch (err) {
       setError('Error al cargar el equipo');
+      setTeam(null);
       console.error(err);
     } finally {
       setLoading(false);
     }
   };
 
-  const handleCreateTeam = async (teamData: { name: string; division: string; players: Player[] }) => {
+  const handleCreateTeam = async (teamData: { name: string; division: string }) => {
     try {
-      const newTeam = await localStorageService.addTeam({
+      // Guardar en localStorage
+      const userId = session?.user?.id;
+      if (!userId) throw new Error('No autenticado');
+      const backup = getLocalBackup(userId) || {
+        equipos: [],
+        jugadores: [],
+        partidos: [],
+        estadisticas: [],
+        datosPersonales: {}
+      };
+      const newTeam = {
+        id: crypto.randomUUID(),
         name: teamData.name,
         division: teamData.division,
-        players: teamData.players,
+        players: [],
         isOpponent: false,
         color: '#59c0d9',
         position: 0,
@@ -77,64 +128,112 @@ export default function TeamPage() {
         matchesLost: 0,
         setsWon: 0,
         setsLost: 0
-      });
+      };
+      backup.equipos.push(newTeam);
+      saveLocalBackup(userId, backup);
       setTeam(newTeam);
       setShowCreateModal(false);
     } catch (err) {
-      setError('Error al crear el equipo');
+      setError('Error al crear el equipo localmente');
       console.error(err);
     }
   };
 
   const handleEditPlayer = async (playerData: Omit<Player, 'id'>) => {
     if (!team || !selectedPlayer) return;
-
     try {
-      const updatedPlayers = team.players.map(player => 
-        player.id === selectedPlayer.id 
-          ? { ...player, ...playerData }
+      const userId = session?.user?.id;
+      if (!userId) throw new Error('No autenticado');
+      const backup = getLocalBackup(userId);
+      if (!backup) throw new Error('No hay backup local');
+      const updatedPlayers = team.players.map(player =>
+        player.id === selectedPlayer.id
+          ? { ...player, ...playerData, ...defaultPlayerFields }
           : player
       );
-
-      const updatedTeam = await localStorageService.updateTeam(team.id, {
-        ...team,
-        players: updatedPlayers
-      });
-
+      const updatedTeam = { ...team, players: updatedPlayers };
+      backup.equipos = backup.equipos.map(eq => eq.id === team.id ? updatedTeam : eq);
+      saveLocalBackup(userId, backup);
       setTeam(updatedTeam);
       setShowEditModal(false);
       setSelectedPlayer(null);
     } catch (err) {
-      setError('Error al actualizar el jugador');
+      setError('Error al actualizar el jugador localmente');
       console.error(err);
     }
   };
 
   const handleAddPlayer = async (playerData: Omit<Player, 'id'>) => {
     if (!team) return;
-
     try {
-      const newPlayer = {
+      const userId = session?.user?.id;
+      if (!userId) throw new Error('No autenticado');
+      const backup = getLocalBackup(userId);
+      if (!backup) throw new Error('No hay backup local');
+      const newPlayer: PlayerType = {
         ...playerData,
+        ...defaultPlayerFields,
         id: crypto.randomUUID()
       };
-
-      const updatedTeam = await localStorageService.updateTeam(team.id, {
-        ...team,
-        players: [...team.players, newPlayer]
-      });
-
+      const updatedTeam = { ...team, players: [...team.players, newPlayer] };
+      backup.equipos = backup.equipos.map(eq => eq.id === team.id ? updatedTeam : eq);
+      saveLocalBackup(userId, backup);
       setTeam(updatedTeam);
       setShowEditModal(false);
       setSelectedPlayer(null);
     } catch (err) {
-      setError('Error al agregar el jugador');
+      setError('Error al agregar el jugador localmente');
       console.error(err);
     }
   };
 
   const handlePlayerClick = (playerId: string) => {
     router.push(`/team/${playerId}`);
+  };
+
+  const getFullPlayer = (player: any): PlayerType => ({
+    ...defaultPlayerFields,
+    ...player
+  });
+
+  // Función para agregar un partido localmente
+  const handleAddMatch = (matchData: Omit<Match, 'id'>) => {
+    try {
+      const userId = session?.user?.id;
+      if (!userId) throw new Error('No autenticado');
+      const backup = getLocalBackup(userId);
+      if (!backup) throw new Error('No hay backup local');
+      const newMatch: Match = { ...matchData, id: crypto.randomUUID() };
+      backup.partidos.push(newMatch);
+      saveLocalBackup(userId, backup);
+      // Si quieres mostrar los partidos en la UI, puedes usar un estado para partidos y actualizarlo aquí
+    } catch (err) {
+      setError('Error al agregar el partido localmente');
+      console.error(err);
+    }
+  };
+
+  // Función para agregar o actualizar una estadística localmente
+  const handleAddOrUpdateStat = (statData: Omit<Estadistica, 'id'>, statId?: string) => {
+    try {
+      const userId = session?.user?.id;
+      if (!userId) throw new Error('No autenticado');
+      const backup = getLocalBackup(userId);
+      if (!backup) throw new Error('No hay backup local');
+      if (statId) {
+        // Actualizar
+        backup.estadisticas = backup.estadisticas.map(est => est.id === statId ? { ...est, ...statData } : est);
+      } else {
+        // Agregar
+        const newStat: Estadistica = { ...statData, id: crypto.randomUUID() };
+        backup.estadisticas.push(newStat);
+      }
+      saveLocalBackup(userId, backup);
+      // Si quieres mostrar las estadísticas en la UI, puedes usar un estado para estadisticas y actualizarlo aquí
+    } catch (err) {
+      setError('Error al guardar la estadística localmente');
+      console.error(err);
+    }
   };
 
   if (loading) {
@@ -239,7 +338,8 @@ export default function TeamPage() {
           setSelectedPlayer(null);
         }}
         onSubmit={selectedPlayer ? handleEditPlayer : handleAddPlayer}
-        player={selectedPlayer}
+        player={selectedPlayer ? getFullPlayer(selectedPlayer) : undefined}
+        isNewPlayer={!selectedPlayer}
       />
     </div>
   );

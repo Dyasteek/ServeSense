@@ -42,4 +42,17 @@ body {
   .animate-float {
     animation: float 6s ease-in-out infinite;
   }
+
+  @keyframes rotate-court {
+    0% {
+      transform: rotate(0deg);
+    }
+    100% {
+      transform: rotate(60deg);
+    }
+  }
+
+  .rotate-animate {
+    animation: rotate-court 0.4s cubic-bezier(0.4, 0, 0.2, 1);
+  }
 } 

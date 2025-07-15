@@ -1,10 +1,13 @@
 'use client';
 
-import { useState, useEffect } from 'react';
+import { useState, useEffect, useRef } from 'react';
 import { localStorageService } from '@/services/localStorage';
 import { useRouter } from 'next/navigation';
 import { XMarkIcon } from '@heroicons/react/24/outline';
 import { Team, Player, PlayerStats } from '@/types/team';
+import { useSession } from 'next-auth/react';
+import { getLocalBackup, saveLocalBackup } from '@/utils/localBackup';
+import { io as socketIOClient } from 'socket.io-client';
 
 interface Stat {
   id: keyof PlayerStats;
@@ -25,10 +28,12 @@ const STATS: Stat[] = [
 ];
 
 export default function LiveMatchPage() {
+  const { data: session } = useSession();
   const [team, setTeam] = useState<Team | null>(null);
   const [loading, setLoading] = useState(true);
   const [error, setError] = useState<string | null>(null);
   const [courtPlayers, setCourtPlayers] = useState<Player[]>([]);
+  const [rotationOffset, setRotationOffset] = useState(0); // Nuevo estado para la rotación visual
   const [showSubstitutionModal, setShowSubstitutionModal] = useState(false);
   const [selectedCourtPlayer, setSelectedCourtPlayer] = useState<Player | null>(null);
   const [selectedBenchPlayer, setSelectedBenchPlayer] = useState<Player | null>(null);
@@ -37,17 +42,54 @@ export default function LiveMatchPage() {
   const [showStatsModal, setShowStatsModal] = useState(false);
   const [selectedPlayer, setSelectedPlayer] = useState<Player | null>(null);
   const router = useRouter();
+  const [isRotating, setIsRotating] = useState(false);
+  const socketRef = useRef<any>(null);
 
   useEffect(() => {
     loadTeam();
+    // eslint-disable-next-line
+  }, [session]);
+
+  // Conexión a Socket.IO para tiempo real
+  useEffect(() => {
+    // Solo conectar una vez
+    if (!socketRef.current) {
+      socketRef.current = socketIOClient(process.env.NEXT_PUBLIC_SOCKET_URL || 'http://localhost:5000');
+    }
+    const socket = socketRef.current;
+    // Escuchar evento de actualización de estadísticas
+    socket.on('stats-updated', ({ playerId, stats }) => {
+      setTeam(prevTeam => {
+        if (!prevTeam) return prevTeam;
+        const updatedPlayers = prevTeam.players.map(p => {
+          if (p.id === playerId || p._id === playerId) {
+            // Actualizar solo las estadísticas recibidas
+            return {
+              ...p,
+              stats: {
+                ...p.stats,
+                ...stats
+              }
+            };
+          }
+          return p;
+        });
+        return { ...prevTeam, players: updatedPlayers };
+      });
+    });
+    return () => {
+      socket.off('stats-updated');
+    };
   }, []);
 
-  const loadTeam = async () => {
+  const loadTeam = () => {
     try {
       setLoading(true);
-      const teams = await localStorageService.getTeams();
-      const localTeam = teams.find(t => !t.isOpponent);
-      if (localTeam) {
+      const userId = session?.user?.id;
+      if (!userId) throw new Error('No autenticado');
+      const backup = getLocalBackup(userId);
+      if (backup && backup.equipos.length > 0) {
+        const localTeam = backup.equipos[0];
         const teamWithStats: Team = {
           ...localTeam,
           players: localTeam.players.map(player => ({
@@ -84,6 +126,10 @@ export default function LiveMatchPage() {
   const handleEndMatch = async () => {
     if (team) {
       try {
+        const userId = session?.user?.id;
+        if (!userId) throw new Error('No autenticado');
+        const backup = getLocalBackup(userId);
+        if (!backup) throw new Error('No hay backup local');
         const updatedTeam: Team = {
           ...team,
           position: team.position || 0,
@@ -116,8 +162,9 @@ export default function LiveMatchPage() {
             contactNumber: player.contactNumber || ''
           }))
         };
-        
-        await localStorageService.updateTeamStats(updatedTeam);
+        // Actualizar equipo en backup local
+        backup.equipos = backup.equipos.map(eq => eq.id === team.id ? updatedTeam : eq);
+        saveLocalBackup(userId, backup);
         router.push('/stats');
       } catch (error) {
         console.error('Error al guardar las estadísticas:', error);
@@ -150,15 +197,7 @@ export default function LiveMatchPage() {
   };
 
   const handleRotation = () => {
-    setCourtPlayers(prevPlayers => {
-      const newPlayers = [...prevPlayers];
-      const lastPlayer = newPlayers[newPlayers.length - 1];
-      for (let i = newPlayers.length - 1; i > 0; i--) {
-        newPlayers[i] = newPlayers[i - 1];
-      }
-      newPlayers[0] = lastPlayer;
-      return newPlayers;
-    });
+    setRotationOffset((prev) => (prev - 1 + 6) % 6); // Rotación visual circular horaria
   };
 
   const handlePlayerSelect = (player: Player) => {
@@ -185,22 +224,43 @@ export default function LiveMatchPage() {
     setShowStatsModal(true);
   };
 
-  const handleStatChange = (statId: keyof PlayerStats, value: number) => {
+  const handleStatChange = (statId: keyof PlayerStats, value: number | 'error') => {
     if (selectedPlayer && team) {
       setTeam(prevTeam => {
         if (!prevTeam) return null;
         const updatedPlayers = prevTeam.players.map(p => {
           if (p.id === selectedPlayer.id) {
-            return {
-              ...p,
-              stats: {
-                ...p.stats,
-                [statId]: (p.stats[statId] || 0) + value
-              }
-            };
+            // Si value es 'error', sumamos a errores, si no, sumamos a la estadística positiva
+            if (value === 'error') {
+              return {
+                ...p,
+                stats: {
+                  ...p.stats,
+                  errores: (p.stats.errores || 0) + 1
+                }
+              };
+            } else {
+              return {
+                ...p,
+                stats: {
+                  ...p.stats,
+                  [statId]: (p.stats[statId] || 0) + value
+                }
+              };
+            }
           }
           return p;
         });
+        // Guardar en backup local
+        const userId = session?.user?.id;
+        if (userId) {
+          const backup = getLocalBackup(userId);
+          if (backup) {
+            const updatedTeam = { ...prevTeam, players: updatedPlayers };
+            backup.equipos = backup.equipos.map(eq => eq.id === prevTeam.id ? updatedTeam : eq);
+            saveLocalBackup(userId, backup);
+          }
+        }
         return { ...prevTeam, players: updatedPlayers };
       });
     }
@@ -239,38 +299,43 @@ export default function LiveMatchPage() {
         <div className="container mx-auto px-4 py-4">
           {/* Cancha de Voleibol */}
           <div className="max-w-md mx-auto mb-4">
-            <div className="bg-white rounded-2xl shadow-lg overflow-hidden">
-              <div className="p-4">
-                <div className="relative w-full aspect-square bg-[#59c0d9] border-4 border-white rounded-lg">
+            <div className={`bg-white rounded-2xl shadow-lg overflow-hidden`}>
+              <div className={`p-4`}>
+                <div className="relative w-full aspect-square bg-[#59c0d9] border-4 border-white rounded-lg transition-transform duration-500">
                   {/* Línea central */}
                   <div className="absolute inset-0 flex flex-col">
                     <div className="h-1/2 w-full border-b-4 border-white"></div>
                   </div>
 
-                  {/* Jugadores en la cancha */}
-                  {courtPlayers.map((player, index) => {
-                    const positions = [
-                      { top: '25%', left: '25%' },  // Zona 1
-                      { top: '25%', left: '50%' },  // Zona 2
-                      { top: '25%', left: '75%' },  // Zona 3
-                      { top: '75%', left: '25%' },  // Zona 4
-                      { top: '75%', left: '50%' },  // Zona 5
-                      { top: '75%', left: '75%' },  // Zona 6
-                    ];
-                    return (
-                      <div
-                        key={player.id}
-                        className="absolute w-8 h-8 bg-white rounded-full border-2 border-white flex items-center justify-center transform -translate-x-1/2 -translate-y-1/2 cursor-pointer hover:bg-gray-100"
-                        style={{
-                          top: positions[index].top,
-                          left: positions[index].left,
-                        }}
-                        onClick={() => handlePlayerClick(player)}
-                      >
-                        <span className="text-xs font-medium text-gray-900">{player.number}</span>
-                      </div>
-                    );
-                  })}
+                  {/* Contenedor de los jugadores sin animación */}
+                  <div className="absolute inset-0">
+                    {courtPlayers.map((_, index: number) => {
+                      const positions = [
+                        { top: '25%', left: '25%' },  // Zona 4 (esquina superior izquierda)
+                        { top: '25%', left: '50%' },  // Zona 3 (arriba centro)
+                        { top: '25%', left: '75%' },  // Zona 2 (esquina superior derecha)
+                        { top: '75%', left: '75%' },  // Zona 1 (esquina inferior derecha)
+                        { top: '75%', left: '50%' },  // Zona 6 (abajo centro)
+                        { top: '75%', left: '25%' },  // Zona 5 (esquina inferior izquierda)
+                      ];
+                      // Mapeo circular
+                      const player = courtPlayers[(index + rotationOffset) % 6];
+                      return (
+                        <div
+                          key={player.id}
+                          className="absolute w-8 h-8 bg-white rounded-full border-2 border-white flex items-center justify-center transform -translate-x-1/2 -translate-y-1/2 cursor-pointer hover:bg-gray-100"
+                          style={{
+                            top: positions[index].top,
+                            left: positions[index].left,
+                            pointerEvents: 'auto',
+                          }}
+                          onClick={() => handlePlayerClick(player)}
+                        >
+                          <span className="text-xs font-medium text-gray-900">{player.number}</span>
+                        </div>
+                      );
+                    })}
+                  </div>
                 </div>
               </div>
             </div>
@@ -370,10 +435,10 @@ export default function LiveMatchPage() {
                         +1
                       </button>
                       <button
-                        onClick={() => handleStatChange(stat.id as keyof PlayerStats, -1)}
+                        onClick={() => handleStatChange(stat.id as keyof PlayerStats, 'error')}
                         className="flex-1 px-3 py-1 bg-red-500 text-white rounded hover:bg-red-600"
                       >
-                        -1
+                        +1 Error
                       </button>
                     </div>
                   </div>

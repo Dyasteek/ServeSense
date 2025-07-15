@@ -86,7 +86,7 @@ export default function PlayerForm({
             type="text"
             value={player.name}
             onChange={(e) => setPlayer({ ...player, name: e.target.value })}
-            className="mt-1 block w-full rounded-md border-gray-300 shadow-sm focus:border-[#59c0d9] focus:ring-[#59c0d9]"
+            className="mt-1 block w-full rounded-md border-gray-300 shadow-sm focus:border-[#59c0d9] focus:ring-[#59c0d9] bg-white text-gray-900"
             placeholder="Nombre del jugador"
           />
         </div>
@@ -99,7 +99,7 @@ export default function PlayerForm({
             type="number"
             value={player.number || ''}
             onChange={(e) => setPlayer({ ...player, number: parseInt(e.target.value) || 0 })}
-            className="mt-1 block w-full rounded-md border-gray-300 shadow-sm focus:border-[#59c0d9] focus:ring-[#59c0d9]"
+            className="mt-1 block w-full rounded-md border-gray-300 shadow-sm focus:border-[#59c0d9] focus:ring-[#59c0d9] bg-white text-gray-900"
             placeholder="Número"
           />
         </div>
@@ -111,7 +111,7 @@ export default function PlayerForm({
           <select
             value={player.position}
             onChange={(e) => setPlayer({ ...player, position: e.target.value })}
-            className="mt-1 block w-full rounded-md border-gray-300 shadow-sm focus:border-[#59c0d9] focus:ring-[#59c0d9]"
+            className="mt-1 block w-full rounded-md border-gray-300 shadow-sm focus:border-[#59c0d9] focus:ring-[#59c0d9] bg-white text-gray-900"
           >
             <option value="">Selecciona una posición</option>
             {POSITIONS.map((position) => (
@@ -130,7 +130,7 @@ export default function PlayerForm({
             type="date"
             value={player.senadeExpiration}
             onChange={(e) => setPlayer({ ...player, senadeExpiration: e.target.value })}
-            className="mt-1 block w-full rounded-md border-gray-300 shadow-sm focus:border-[#59c0d9] focus:ring-[#59c0d9]"
+            className="mt-1 block w-full rounded-md border-gray-300 shadow-sm focus:border-[#59c0d9] focus:ring-[#59c0d9] bg-white text-gray-900"
           />
         </div>
 
@@ -142,7 +142,7 @@ export default function PlayerForm({
             type="date"
             value={player.healthCardExpiration}
             onChange={(e) => setPlayer({ ...player, healthCardExpiration: e.target.value })}
-            className="mt-1 block w-full rounded-md border-gray-300 shadow-sm focus:border-[#59c0d9] focus:ring-[#59c0d9]"
+            className="mt-1 block w-full rounded-md border-gray-300 shadow-sm focus:border-[#59c0d9] focus:ring-[#59c0d9] bg-white text-gray-900"
           />
         </div>
 
@@ -154,7 +154,7 @@ export default function PlayerForm({
             type="tel"
             value={player.emergencyContact}
             onChange={(e) => setPlayer({ ...player, emergencyContact: e.target.value })}
-            className="mt-1 block w-full rounded-md border-gray-300 shadow-sm focus:border-[#59c0d9] focus:ring-[#59c0d9]"
+            className="mt-1 block w-full rounded-md border-gray-300 shadow-sm focus:border-[#59c0d9] focus:ring-[#59c0d9] bg-white text-gray-900"
             placeholder="Número de emergencia"
           />
         </div>
@@ -167,7 +167,7 @@ export default function PlayerForm({
             type="tel"
             value={player.contactNumber}
             onChange={(e) => setPlayer({ ...player, contactNumber: e.target.value })}
-            className="mt-1 block w-full rounded-md border-gray-300 shadow-sm focus:border-[#59c0d9] focus:ring-[#59c0d9]"
+            className="mt-1 block w-full rounded-md border-gray-300 shadow-sm focus:border-[#59c0d9] focus:ring-[#59c0d9] bg-white text-gray-900"
             placeholder="Número de contacto"
           />
         </div>
@@ -180,7 +180,7 @@ export default function PlayerForm({
             type="number"
             value={player.yellowCards}
             onChange={(e) => setPlayer({ ...player, yellowCards: parseInt(e.target.value) || 0 })}
-            className="mt-1 block w-full rounded-md border-gray-300 shadow-sm focus:border-[#59c0d9] focus:ring-[#59c0d9]"
+            className="mt-1 block w-full rounded-md border-gray-300 shadow-sm focus:border-[#59c0d9] focus:ring-[#59c0d9] bg-white text-gray-900"
             min="0"
           />
         </div>
@@ -193,7 +193,7 @@ export default function PlayerForm({
             type="number"
             value={player.redCards}
             onChange={(e) => setPlayer({ ...player, redCards: parseInt(e.target.value) || 0 })}
-            className="mt-1 block w-full rounded-md border-gray-300 shadow-sm focus:border-[#59c0d9] focus:ring-[#59c0d9]"
+            className="mt-1 block w-full rounded-md border-gray-300 shadow-sm focus:border-[#59c0d9] focus:ring-[#59c0d9] bg-white text-gray-900"
             min="0"
           />
         </div>

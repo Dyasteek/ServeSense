@@ -21,6 +21,11 @@ const teamSchema = new mongoose.Schema({
   leagueId: {
     type: mongoose.Schema.Types.ObjectId,
     ref: 'League',
+    // required: true // Ahora no es obligatorio
+  },
+  owner: {
+    type: mongoose.Schema.Types.ObjectId,
+    ref: 'User',
     required: true
   },
   createdAt: {

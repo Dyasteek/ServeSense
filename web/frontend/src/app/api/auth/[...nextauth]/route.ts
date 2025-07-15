@@ -78,4 +78,12 @@ const handler = NextAuth({
   secret: process.env.NEXTAUTH_SECRET,
 });
 
-export { handler as GET, handler as POST }; 
+const authOptions = {
+  providers: handler.providers,
+  callbacks: handler.callbacks,
+  pages: handler.pages,
+  session: handler.session,
+  secret: process.env.NEXTAUTH_SECRET,
+};
+
+export { handler as GET, handler as POST, authOptions }; 

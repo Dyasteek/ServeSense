@@ -8,7 +8,7 @@ import PlayerForm from './PlayerForm';
 interface CreateTeamModalProps {
   isOpen: boolean;
   onClose: () => void;
-  onSubmit: (teamData: { name: string; division: string; players: Player[] }) => void;
+  onSubmit: (teamData: { name: string; division: string }) => void;
 }
 
 const POSITIONS = [
@@ -34,33 +34,15 @@ const initialPlayerStats = {
 export default function CreateTeamModal({ isOpen, onClose, onSubmit }: CreateTeamModalProps) {
   const [name, setName] = useState('');
   const [division, setDivision] = useState('');
-  const [players, setPlayers] = useState<Player[]>([]);
-  const [showPlayerForm, setShowPlayerForm] = useState(false);
   const [error, setError] = useState<string | null>(null);
-
-  const handleAddPlayer = (playerData: Omit<Player, 'id'>) => {
-    const playerWithId = {
-      ...playerData,
-      id: crypto.randomUUID()
-    };
-
-    setPlayers([...players, playerWithId]);
-    setShowPlayerForm(false);
-  };
-
-  const handleRemovePlayer = (id: string) => {
-    setPlayers(players.filter(player => player.id !== id));
-  };
 
   const handleSubmit = async (e: React.FormEvent) => {
     e.preventDefault();
-    
-    if (!name || !division || players.length === 0) {
+    if (!name || !division) {
       setError('Por favor completa todos los campos');
       return;
     }
-
-    onSubmit({ name, division, players });
+    onSubmit({ name, division });
     onClose();
   };
 
@@ -97,7 +79,7 @@ export default function CreateTeamModal({ isOpen, onClose, onSubmit }: CreateTea
                 type="text"
                 value={name}
                 onChange={(e) => setName(e.target.value)}
-                className="mt-1 block w-full rounded-md border-gray-300 shadow-sm focus:border-[#59c0d9] focus:ring-[#59c0d9]"
+                className="mt-1 block w-full rounded-md border-gray-300 shadow-sm focus:border-[#59c0d9] focus:ring-[#59c0d9] bg-white text-gray-900"
                 placeholder="Ej: Los Halcones"
               />
             </div>
@@ -110,58 +92,9 @@ export default function CreateTeamModal({ isOpen, onClose, onSubmit }: CreateTea
                 type="text"
                 value={division}
                 onChange={(e) => setDivision(e.target.value)}
-                className="mt-1 block w-full rounded-md border-gray-300 shadow-sm focus:border-[#59c0d9] focus:ring-[#59c0d9]"
+                className="mt-1 block w-full rounded-md border-gray-300 shadow-sm focus:border-[#59c0d9] focus:ring-[#59c0d9] bg-white text-gray-900"
                 placeholder="Ej: Primera División"
               />
-            </div>
-          </div>
-
-          <div className="space-y-4">
-            <div className="flex justify-between items-center">
-              <h3 className="text-lg font-medium text-gray-900">Jugadores</h3>
-              <button
-                type="button"
-                onClick={() => setShowPlayerForm(true)}
-                className="inline-flex items-center px-4 py-2 border border-transparent text-sm font-medium rounded-md text-white bg-[#59c0d9] hover:bg-[#59c0d9]/90 focus:outline-none focus:ring-2 focus:ring-offset-2 focus:ring-[#59c0d9]"
-              >
-                Agregar Jugador
-              </button>
-            </div>
-
-            {showPlayerForm && (
-              <div className="bg-gray-50 p-4 rounded-lg">
-                <PlayerForm
-                  onSubmit={handleAddPlayer}
-                  onCancel={() => setShowPlayerForm(false)}
-                  submitButtonText="Agregar Jugador"
-                />
-              </div>
-            )}
-
-            <div className="space-y-2">
-              {players.map((player) => (
-                <div
-                  key={player.id}
-                  className="flex items-center justify-between p-3 bg-gray-50 rounded-lg"
-                >
-                  <div className="flex-1">
-                    <p className="font-medium">{player.name}</p>
-                    <p className="text-sm text-gray-500">
-                      #{player.number} - {player.position}
-                    </p>
-                    <p className="text-xs text-gray-400">
-                      SENADE: {player.senadeExpiration} | Ficha Médica: {player.healthCardExpiration}
-                    </p>
-                  </div>
-                  <button
-                    type="button"
-                    onClick={() => handleRemovePlayer(player.id)}
-                    className="text-red-600 hover:text-red-800"
-                  >
-                    <XMarkIcon className="h-5 w-5" />
-                  </button>
-                </div>
-              ))}
             </div>
           </div>
 
